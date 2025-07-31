@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".fragment.DaoJuFragment">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="2"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <ImageButton
+                    android:id="@+id/add_map"
+                    android:layout_width="40sp"
+                    android:layout_height="40sp"
+                    android:scaleType="fitCenter"
+                    android:background="@drawable/button_background"
+                    android:src="@drawable/add_ico"
+                    android:layout_marginEnd="10sp"/>
+                <ImageButton
+                    android:id="@+id/minus_map"
+                    android:layout_width="35sp"
+                    android:layout_height="40sp"
+                    android:scaleType="fitCenter"
+                    android:background="@drawable/button_background"
+                    android:src="@drawable/minus_ico"
+                    android:layout_marginStart="10sp"/>
+            </LinearLayout>
+
+
+            <ListView
+                android:id="@+id/list_mapname"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"/>
+
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="5"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <!-- 添加全选复选框 -->
+            <CheckBox
+                android:id="@+id/cb_select_all"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="全选"
+                android:layout_margin="8dp" />
+
+            <ListView
+                android:id="@+id/list_daoju"
+                android:layout_width="match_parent"
+                android:layout_height="610sp"/>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="end">
+                <ImageButton
+                    android:id="@+id/minus_daoju"
+                    android:layout_width="35sp"
+                    android:layout_height="40sp"
+                    android:scaleType="fitCenter"
+                    android:background="@drawable/button_background"
+                    android:src="@drawable/minus_ico"
+                    android:layout_marginEnd="10sp"/>
+                <ImageButton
+                    android:id="@+id/add_daoju"
+                    android:layout_width="40sp"
+                    android:layout_height="40sp"
+                    android:scaleType="fitCenter"
+                    android:background="@drawable/button_background"
+                    android:src="@drawable/add_ico"
+                    android:layout_marginEnd="10sp"/>
+
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+</FrameLayout>

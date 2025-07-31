@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".DaojuInformationActivity">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/tv_map_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="您正在向(地图)添加道具"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="16dp"
+            android:background="@android:color/holo_blue_light"
+            android:padding="8dp"
+            android:textColor="@android:color/white" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="道具信息录入"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="24dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:hint="道具名称">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_tool_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="道具类型"
+            android:textSize="16sp"
+            android:layout_marginBottom="8dp" />
+
+        <RadioGroup
+            android:id="@+id/rg_daoju_type"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp">
+
+            <RadioButton
+                android:id="@+id/rb_smoke"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="烟雾弹" />
+
+            <RadioButton
+                android:id="@+id/rb_molotov"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="燃烧瓶" />
+
+            <RadioButton
+                android:id="@+id/rb_grenade"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="手雷" />
+
+            <RadioButton
+                android:id="@+id/rb_flashbang"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="闪光弹" />
+        </RadioGroup>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:hint="投掷方式">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_throwing_method"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:hint="道具位置(道具分组使用，建议A,B,Mid等)">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_position"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- 站位图片选择 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="站位图片"
+            android:textSize="16sp"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/btn_select_stance_image"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="选择站位图片"
+            android:layout_marginBottom="8dp" />
+
+        <ImageView
+            android:id="@+id/iv_stance_image_preview"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:layout_marginBottom="16dp"
+            android:background="@android:color/darker_gray"
+            android:scaleType="centerCrop" />
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@android:color/darker_gray"
+            android:layout_marginBottom="24dp" />
+
+        <!-- 瞄点图片选择 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="瞄点图片"
+            android:textSize="16sp"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/btn_select_aim_point_image"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="选择瞄点图片"
+            android:layout_marginBottom="8dp" />
+
+        <ImageView
+            android:id="@+id/iv_aim_point_image_preview"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:layout_marginBottom="16dp"
+            android:background="@android:color/darker_gray"
+            android:scaleType="centerCrop" />
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@android:color/darker_gray"
+            android:layout_marginBottom="24dp" />
+
+        <!-- 落点图片选择 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="落点图片"
+            android:textSize="16sp"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/btn_select_landing_point_image"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="选择落点图片"
+            android:layout_marginBottom="8dp" />
+
+        <ImageView
+            android:id="@+id/iv_landing_point_image_preview"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:layout_marginBottom="24dp"
+            android:background="@android:color/darker_gray"
+            android:scaleType="centerCrop" />
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@android:color/darker_gray"
+            android:layout_marginBottom="24dp" />
+
+        <Button
+            android:id="@+id/btn_save"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="保存"
+            android:textSize="18sp" />
+
+    </LinearLayout>
+
+</ScrollView>
