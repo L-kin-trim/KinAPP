@@ -128,7 +128,24 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public int getCount() {
-            return 4;
+            return 2; // 修改为实际的 Fragment 数量
         }
+    }
+
+    @Override
+    public void onBackPressed() {
+        // 获取当前显示的 Fragment
+        Fragment currentFragment = getSupportFragmentManager().findFragmentByTag("android:switcher:" + R.id.viewpager + ":" + mViewPager.getCurrentItem());
+
+        // 检查是否是 DaoJuFragment 并且是否处理了返回键事件
+        if (currentFragment instanceof DaoJuFragment) {
+            if (((DaoJuFragment) currentFragment).onBackPressed()) {
+                // 如果 Fragment 处理了返回键事件，则不调用 super.onBackPressed()
+                return;
+            }
+        }
+
+        // 如果 Fragment 没有处理返回键事件，则调用默认的返回键处理
+        super.onBackPressed();
     }
 }

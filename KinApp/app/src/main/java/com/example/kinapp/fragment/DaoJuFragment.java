@@ -12,16 +12,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.BaseAdapter;
 import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.example.kinapp.DaojuInformationActivity;
-import com.example.kinapp.DaojuSingleActivity;
 import com.example.kinapp.R;
 import com.example.kinapp.utils.MapDAO;
 import com.example.kinapp.utils.MapDAO.MapItem;
@@ -36,7 +33,6 @@ public class DaoJuFragment extends Fragment {
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
 
-    // TODO: Rename and change types of parameters
     private String mParam1;
     private String mParam2;
 
@@ -45,42 +41,19 @@ public class DaoJuFragment extends Fragment {
     private ArrayAdapter<String> mapNameAdapter;
     private GroupDaojuAdapter groupDaojuAdapter; // 分组道具适配器
     private List<String> mapNames;
-    private List<GroupItem> groupedDaojuItems; // 分组的道具项列表
     private MapDAO mapDAO;
     private DaojuInformationDAO daojuInformationDAO; // 道具信息DAO
+    // ... existing code ...
     private int selectedPosition = -1; // 记录选中的位置
     private int selectedMapId = -1; // 记录选中的地图ID
     private CheckBox cbSelectAll; // 全选复选框
-
-    // 道具项内部类
-    private static class DaojuItem {
-        String text;
-        boolean isSelected;
-        int infoId; // 道具信息ID，用于删除操作
-
-        DaojuItem(String text, boolean isSelected, int infoId) {
-            this.text = text;
-            this.isSelected = isSelected;
-            this.infoId = infoId;
-        }
-    }
-
-    // 分组项内部类
-    private static class GroupItem {
-        String groupName;
-        List<DaojuItem> children;
-        boolean isExpanded;
-
-        GroupItem(String groupName) {
-            this.groupName = groupName;
-            this.children = new ArrayList<>();
-            this.isExpanded = false;
-        }
-    }
+    private boolean shouldReloadData = false; // 标记是否需要重新加载数据
 
     public DaoJuFragment() {
         // Required empty public constructor
     }
+
+
     public static DaoJuFragment newInstance(String param1, String param2) {
         DaoJuFragment fragment = new DaoJuFragment();
         Bundle args = new Bundle();
@@ -100,7 +73,6 @@ public class DaoJuFragment extends Fragment {
 
         // 初始化数据
         mapNames = new ArrayList<>();
-        groupedDaojuItems = new ArrayList<>(); // 初始化分组道具项列表
         Context context = getContext();
         if (context != null) {
             mapDAO = new MapDAO(context);
@@ -108,7 +80,6 @@ public class DaoJuFragment extends Fragment {
             loadMapNames();
         }
     }
-
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -120,6 +91,9 @@ public class DaoJuFragment extends Fragment {
         listMapName = view.findViewById(R.id.list_mapname);
         listDaoju = view.findViewById(R.id.list_daoju); // 初始化道具列表
         cbSelectAll = view.findViewById(R.id.cb_select_all); // 初始化全选复选框
+
+        // 默认隐藏全选复选框
+        cbSelectAll.setVisibility(View.GONE);
 
         mapNameAdapter = new ArrayAdapter<String>(requireContext(), android.R.layout.simple_list_item_1, mapNames) {
             @Override
@@ -138,7 +112,22 @@ public class DaoJuFragment extends Fragment {
         };
 
         // 创建分组道具列表适配器
-        groupDaojuAdapter = new GroupDaojuAdapter();
+        groupDaojuAdapter = new GroupDaojuAdapter(requireContext(), daojuInformationDAO);
+
+        // 设置选择状态变化监听器
+        groupDaojuAdapter.setOnItemSelectionChangedListener(new GroupDaojuAdapter.OnItemSelectionChangedListener() {
+            @Override
+            public void onItemSelectionChanged() {
+                updateSelectAllState();
+            }
+
+            @Override
+            public void onSelectionModeChanged(boolean isInSelectionMode) {
+                // 显示或隐藏全选复选框
+                cbSelectAll.setVisibility(isInSelectionMode ? View.VISIBLE : View.GONE);
+                updateSelectAllState();
+            }
+        });
 
         listMapName.setAdapter(mapNameAdapter);
         listDaoju.setAdapter(groupDaojuAdapter); // 设置道具列表适配器
@@ -186,17 +175,44 @@ public class DaoJuFragment extends Fragment {
         return view;
     }
 
+    // 在 DaoJuFragment 类中添加以下方法来启动 DaojuInformationActivity
+    private void openDaojuInformationActivityForEdit(int daojuInfoId, String mapName) {
+        Intent intent = new Intent(getActivity(), DaojuInformationActivity.class);
+        intent.putExtra("info_id", daojuInfoId);
+        intent.putExtra("map_name", mapName);
+        startActivity(intent);
+
+        // 标记需要在返回时重新加载数据
+        shouldReloadData = true;
+    }
+
+    // 处理返回键事件
+    public boolean onBackPressed() {
+        // 如果处于选择模式，则退出选择模式
+        if (groupDaojuAdapter.isShowCheckBoxes()) {
+            exitSelectionMode();
+            return true; // 已处理返回键事件
+        }
+        return false; // 未处理返回键事件
+    }
+
+    // 退出选择模式
+    private void exitSelectionMode() {
+        groupDaojuAdapter.setShowCheckBoxes(false);
+        cbSelectAll.setVisibility(View.GONE);
+        cbSelectAll.setChecked(false);
+    }
 
     // 更新全选复选框的状态
     private void updateSelectAllState() {
-        if (groupedDaojuItems.isEmpty()) {
+        if (groupDaojuAdapter.getData().isEmpty()) {
             cbSelectAll.setChecked(false);
             return;
         }
 
         boolean allSelected = true;
-        for (GroupItem group : groupedDaojuItems) {
-            for (DaojuItem item : group.children) {
+        for (GroupDaojuAdapter.GroupItem group : groupDaojuAdapter.getData()) {
+            for (GroupDaojuAdapter.DaojuItem item : group.children) {
                 if (!item.isSelected) {
                     allSelected = false;
                     break;
@@ -211,25 +227,13 @@ public class DaoJuFragment extends Fragment {
 
     // 全选或取消全选
     private void selectAll(boolean select) {
-        for (GroupItem group : groupedDaojuItems) {
-            for (DaojuItem item : group.children) {
-                item.isSelected = select;
-            }
-        }
-        groupDaojuAdapter.notifyDataSetChanged();
+        groupDaojuAdapter.selectAll(select);
     }
 
     // 确认删除选中的道具
     private void confirmDeleteDaoju() {
         // 统计选中的道具数量
-        int selectedCount = 0;
-        for (GroupItem group : groupedDaojuItems) {
-            for (DaojuItem item : group.children) {
-                if (item.isSelected) {
-                    selectedCount++;
-                }
-            }
-        }
+        int selectedCount = groupDaojuAdapter.getSelectedCount();
 
         if (selectedCount == 0) {
             Toast.makeText(getContext(), "请先选择要删除的道具", Toast.LENGTH_SHORT).show();
@@ -255,36 +259,19 @@ public class DaoJuFragment extends Fragment {
 
     // 删除选中的道具
     private void deleteSelectedDaoju() {
-        boolean hasDeleted = false;
-
-        // 从后往前遍历组和子项，避免删除时索引变化的问题
-        for (int i = groupedDaojuItems.size() - 1; i >= 0; i--) {
-            GroupItem group = groupedDaojuItems.get(i);
-            for (int j = group.children.size() - 1; j >= 0; j--) {
-                DaojuItem item = group.children.get(j);
-                if (item.isSelected) {
-                    // 从数据库中删除道具信息
-                    int result = daojuInformationDAO.deleteDaojuInformation(item.infoId);
-                    if (result > 0) {
-                        // 从列表中移除
-                        group.children.remove(j);
-                        hasDeleted = true;
-                    }
-                }
-            }
-
-            // 如果组中没有子项了，移除整个组
-            if (group.children.isEmpty()) {
-                groupedDaojuItems.remove(i);
-            }
-        }
+        boolean hasDeleted = groupDaojuAdapter.deleteSelectedItems(daojuInformationDAO);
 
         if (hasDeleted) {
-            groupDaojuAdapter.notifyDataSetChanged();
             Toast.makeText(getContext(), "道具删除成功", Toast.LENGTH_SHORT).show();
 
             // 清除全选状态
             cbSelectAll.setChecked(false);
+
+            // 如果所有项目都被删除，退出选择模式
+            if (groupDaojuAdapter.getCount() == 0) {
+                groupDaojuAdapter.setShowCheckBoxes(false);
+                cbSelectAll.setVisibility(View.GONE);
+            }
         } else {
             Toast.makeText(getContext(), "道具删除失败", Toast.LENGTH_SHORT).show();
         }
@@ -386,7 +373,6 @@ public class DaoJuFragment extends Fragment {
         builder.show();
     }
 
-
     /**
      * 打开道具信息录入页面
      */
@@ -401,8 +387,10 @@ public class DaoJuFragment extends Fragment {
         String selectedMapName = mapNames.get(selectedPosition);
         intent.putExtra("map_name", selectedMapName);
         startActivity(intent);
-    }
 
+        // 标记需要在返回时重新加载数据
+        shouldReloadData = true;
+    }
 
     /**
      * 加载地图名称列表
@@ -429,14 +417,14 @@ public class DaoJuFragment extends Fragment {
      * @param mapId 地图ID
      */
     private void loadDaojuInformation(int mapId) {
-        // 清空分组数据
-        groupedDaojuItems.clear();
+        // 创建一个列表来存储分组数据
+        List<GroupDaojuAdapter.GroupItem> groupedItems = new ArrayList<>();
 
         // 获取与该地图关联的所有道具
         List<MapDAO.DaojuItem> daojuList = mapDAO.getDaojuByMapId(mapId);
 
         // 创建一个Map来按位置分组
-        Map<String, GroupItem> groups = new HashMap<>();
+        Map<String, GroupDaojuAdapter.GroupItem> groups = new HashMap<>();
 
         // 获取每个道具的详细信息
         for (MapDAO.DaojuItem daojuItem : daojuList) {
@@ -452,29 +440,40 @@ public class DaoJuFragment extends Fragment {
                 }
 
                 // 查找或创建组
-                GroupItem groupItem = groups.get(position);
+                GroupDaojuAdapter.GroupItem groupItem = groups.get(position);
                 if (groupItem == null) {
-                    groupItem = new GroupItem(position);
+                    groupItem = new GroupDaojuAdapter.GroupItem(position);
                     groups.put(position, groupItem);
                 }
 
                 // 添加道具项到对应的组
-                DaojuItem item = new DaojuItem(itemText, false, info.getId());
+                GroupDaojuAdapter.DaojuItem item = new GroupDaojuAdapter.DaojuItem(itemText, false, info.getId());
                 groupItem.children.add(item);
             }
         }
 
         // 将分组数据添加到列表中
-        for (Map.Entry<String, GroupItem> entry : groups.entrySet()) {
-            groupedDaojuItems.add(entry.getValue());
+        for (Map.Entry<String, GroupDaojuAdapter.GroupItem> entry : groups.entrySet()) {
+            groupedItems.add(entry.getValue());
         }
 
-        if (groupDaojuAdapter != null) {
-            groupDaojuAdapter.notifyDataSetChanged();
-        }
+        // 更新适配器数据
+        groupDaojuAdapter.updateData(groupedItems);
 
-        // 清除全选状态
+        // 重置选择模式
+        groupDaojuAdapter.setShowCheckBoxes(false);
+        cbSelectAll.setVisibility(View.GONE);
         cbSelectAll.setChecked(false);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // 当Fragment重新可见时，检查是否需要重新加载数据
+        if (shouldReloadData && selectedMapId != -1) {
+            loadDaojuInformation(selectedMapId);
+            shouldReloadData = false;
+        }
     }
 
     /**
@@ -494,213 +493,6 @@ public class DaoJuFragment extends Fragment {
                 return "闪光弹";
             default:
                 return "未知";
-        }
-    }
-
-    // 自定义分组道具列表适配器
-    private class GroupDaojuAdapter extends BaseAdapter {
-        private static final int TYPE_GROUP = 0;
-        private static final int TYPE_CHILD = 1;
-
-        @Override
-        public int getCount() {
-            int count = 0;
-            for (GroupItem group : groupedDaojuItems) {
-                count++; // 组头
-                if (group.isExpanded) {
-                    count += group.children.size(); // 子项
-                }
-            }
-            return count;
-        }
-
-        @Override
-        public int getViewTypeCount() {
-            return 2; // 组头和子项两种类型
-        }
-
-        @Override
-        public int getItemViewType(int position) {
-            // 计算当前位置对应的项类型
-            int currentPosition = 0;
-            for (GroupItem group : groupedDaojuItems) {
-                if (currentPosition == position) {
-                    return TYPE_GROUP; // 组头
-                }
-                currentPosition++;
-
-                if (group.isExpanded) {
-                    if (position < currentPosition + group.children.size()) {
-                        return TYPE_CHILD; // 子项
-                    }
-                    currentPosition += group.children.size();
-                }
-            }
-            return TYPE_GROUP;
-        }
-
-        @Override
-        public Object getItem(int position) {
-            // 计算当前位置对应的项
-            int currentPosition = 0;
-            for (GroupItem group : groupedDaojuItems) {
-                if (currentPosition == position) {
-                    return group; // 组头
-                }
-                currentPosition++;
-
-                if (group.isExpanded) {
-                    if (position < currentPosition + group.children.size()) {
-                        return group.children.get(position - currentPosition); // 子项
-                    }
-                    currentPosition += group.children.size();
-                }
-            }
-            return null;
-        }
-
-        @Override
-        public long getItemId(int position) {
-            return position;
-        }
-
-        @Override
-        public View getView(int position, View convertView, ViewGroup parent) {
-            int type = getItemViewType(position);
-
-            if (type == TYPE_GROUP) {
-                // 处理组头
-                GroupViewHolder groupHolder;
-                if (convertView == null || !(convertView.getTag() instanceof GroupViewHolder)) {
-                    convertView = LayoutInflater.from(getContext()).inflate(R.layout.item_daoju_group, parent, false);
-                    groupHolder = new GroupViewHolder();
-                    groupHolder.textView = convertView.findViewById(R.id.tv_group_name);
-                    groupHolder.indicator = convertView.findViewById(R.id.iv_indicator);
-                    convertView.setTag(groupHolder);
-                } else {
-                    groupHolder = (GroupViewHolder) convertView.getTag();
-                }
-
-                // 获取组数据
-                int groupIndex = getGroupIndex(position);
-                GroupItem group = groupedDaojuItems.get(groupIndex);
-
-                // 设置组名和子项数量
-                groupHolder.textView.setText(group.groupName + " (" + group.children.size() + ")");
-
-                // 设置展开/收起图标
-                groupHolder.indicator.setImageResource(group.isExpanded ?
-                        android.R.drawable.arrow_down_float : android.R.drawable.arrow_up_float);
-
-                // 设置点击事件
-                final int finalGroupIndex = groupIndex;
-                convertView.setOnClickListener(v -> toggleGroup(finalGroupIndex));
-
-                return convertView;
-            } else {
-                // 处理子项
-                ChildViewHolder childHolder;
-                if (convertView == null || !(convertView.getTag() instanceof ChildViewHolder)) {
-                    convertView = LayoutInflater.from(getContext()).inflate(R.layout.item_daoju, parent, false);
-                    childHolder = new ChildViewHolder();
-                    childHolder.checkBox = convertView.findViewById(R.id.cb_daoju_select);
-                    childHolder.textView = convertView.findViewById(R.id.tv_daoju_text);
-                    convertView.setTag(childHolder);
-                } else {
-                    childHolder = (ChildViewHolder) convertView.getTag();
-                }
-
-                // 获取子项数据
-                ChildPosition childPos = getChildPosition(position);
-                DaojuItem item = groupedDaojuItems.get(childPos.groupIndex).children.get(childPos.childIndex);
-
-                childHolder.textView.setText(item.text);
-
-                // 移除之前的监听器避免重复触发
-                childHolder.checkBox.setOnCheckedChangeListener(null);
-                childHolder.checkBox.setChecked(item.isSelected);
-
-                // 为复选框设置监听器
-                childHolder.checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                    item.isSelected = isChecked;
-                    // 检查是否所有项都被选中以更新全选复选框
-                    updateSelectAllState();
-                });
-
-                // 为整个列表项设置点击监听器
-                final int infoId = item.infoId;
-                convertView.setOnClickListener(v -> {
-                    Intent intent = new Intent(getActivity(), DaojuSingleActivity.class);
-                    intent.putExtra("info_id", infoId);
-                    startActivity(intent);
-                });
-
-                return convertView;
-            }
-        }
-
-        // 获取指定位置属于第几个组
-        private int getGroupIndex(int position) {
-            int currentPosition = 0;
-            for (int i = 0; i < groupedDaojuItems.size(); i++) {
-                GroupItem group = groupedDaojuItems.get(i);
-                if (currentPosition == position) {
-                    return i;
-                }
-                currentPosition++;
-
-                if (group.isExpanded) {
-                    if (position < currentPosition + group.children.size()) {
-                        return i;
-                    }
-                    currentPosition += group.children.size();
-                }
-            }
-            return groupedDaojuItems.size() - 1;
-        }
-
-        // 获取子项在组内的位置
-        private ChildPosition getChildPosition(int position) {
-            int currentPosition = 0;
-            for (int i = 0; i < groupedDaojuItems.size(); i++) {
-                GroupItem group = groupedDaojuItems.get(i);
-                currentPosition++;
-
-                if (group.isExpanded) {
-                    if (position < currentPosition + group.children.size()) {
-                        return new ChildPosition(i, position - currentPosition);
-                    }
-                    currentPosition += group.children.size();
-                }
-            }
-            return new ChildPosition(0, 0);
-        }
-
-        // 展开/收起组
-        private void toggleGroup(int groupIndex) {
-            GroupItem group = groupedDaojuItems.get(groupIndex);
-            group.isExpanded = !group.isExpanded;
-            notifyDataSetChanged();
-        }
-
-        private class GroupViewHolder {
-            TextView textView;
-            ImageView indicator;
-        }
-
-        private class ChildViewHolder {
-            CheckBox checkBox;
-            TextView textView;
-        }
-
-        private class ChildPosition {
-            int groupIndex;
-            int childIndex;
-
-            ChildPosition(int groupIndex, int childIndex) {
-                this.groupIndex = groupIndex;
-                this.childIndex = childIndex;
-            }
         }
     }
 }

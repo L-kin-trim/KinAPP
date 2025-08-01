@@ -16,6 +16,32 @@ public class MapDAO {
     }
 
     /**
+     * 根据道具信息ID获取相关道具
+     * @param infoId 道具信息ID
+     * @return 相关道具列表
+     */
+    public List<DaojuItem> getAllDaojuItemsByInfoId(int infoId) {
+        List<DaojuItem> list = new ArrayList<>();
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Cursor cursor = db.query("daoju", null, "info_id=?", new String[]{String.valueOf(infoId)}, null, null, null);
+
+        if (cursor.moveToFirst()) {
+            do {
+                int id = cursor.getInt(cursor.getColumnIndexOrThrow("id"));
+                int mapId = cursor.getInt(cursor.getColumnIndexOrThrow("map_id"));
+                int type = cursor.getInt(cursor.getColumnIndexOrThrow("type"));
+                String position = cursor.getString(cursor.getColumnIndexOrThrow("position"));
+                list.add(new DaojuItem(id, mapId, type, position, infoId));
+            } while (cursor.moveToNext());
+        }
+
+        cursor.close();
+        db.close();
+        return list;
+    }
+
+
+    /**
      * 向地图表中添加一条记录
      * @param name 地图名称
      * @param iconPosition 图标位置

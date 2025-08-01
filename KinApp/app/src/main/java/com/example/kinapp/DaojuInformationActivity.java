@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -30,6 +31,8 @@ import com.example.kinapp.utils.MapDAO;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.List;
+
 
 public class DaojuInformationActivity extends AppCompatActivity {
     private EditText etThrowingMethod, etToolName, etPosition;
@@ -76,10 +79,12 @@ public class DaojuInformationActivity extends AppCompatActivity {
         // 检查并请求存储权限
         checkAndRequestPermissions();
 
-        // 获取传递的地图信息
+        // 获取传递的地图信息和道具信息ID
         Intent intent = getIntent();
         selectedMapId = intent.getIntExtra("map_id", 1);
         selectedMapName = intent.getStringExtra("map_name");
+        int daojuInfoId = intent.getIntExtra("info_id", -1);
+
         if (selectedMapName == null) {
             selectedMapName = "默认地图";
         }
@@ -92,16 +97,22 @@ public class DaojuInformationActivity extends AppCompatActivity {
         initViews();
 
         // 设置提示信息
-        tvMapInfo.setText("您正在向 " + selectedMapName + " 添加道具");
+        tvMapInfo.setText("您正在修改 " + selectedMapName + " 地图的道具");
+
+        // 如果有道具信息ID，则加载道具信息
+        if (daojuInfoId != -1) {
+            loadDaojuInformation(daojuInfoId);
+        }
 
         // 设置保存按钮点击事件
         btnSave.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                saveDaojuInformation();
+                saveDaojuInformation(daojuInfoId);
             }
         });
     }
+
 
     // 检查并请求存储权限
     private void checkAndRequestPermissions() {
@@ -113,6 +124,8 @@ public class DaojuInformationActivity extends AppCompatActivity {
         }
     }
 
+
+    // ... existing code ...
     private void initViews() {
         tvMapInfo = findViewById(R.id.tv_map_info);
         etThrowingMethod = findViewById(R.id.et_throwing_method);
@@ -142,6 +155,9 @@ public class DaojuInformationActivity extends AppCompatActivity {
         btnSelectAimPointImage.setOnClickListener(v -> selectImage(REQUEST_AIM_POINT_IMAGE));
         btnSelectLandingPointImage.setOnClickListener(v -> selectImage(REQUEST_LANDING_POINT_IMAGE));
     }
+// ... existing code ...
+
+
 
     // 选择图片的方法
     private void selectImage(int requestCode) {
@@ -217,10 +233,80 @@ public class DaojuInformationActivity extends AppCompatActivity {
         }
     }
 
-    private void saveDaojuInformation() {
+    // ... existing code ...
+    private void loadDaojuInformation(int daojuInfoId) {
+        DaojuInformationDAO.DaojuInformation info = daojuInformationDAO.getDaojuInformationById(daojuInfoId);
+        if (info != null) {
+            etThrowingMethod.setText(info.getThrowingMethod());
+            etToolName.setText(info.getToolName());
+            // position字段需要从daoju表中获取
+
+            // 设置图片预览
+            stanceImagePath = info.getStanceImagePath();
+            aimPointImagePath = info.getAimPointImagePath();
+            landingPointImagePath = info.getLandingPointImagePath();
+
+            if (!stanceImagePath.isEmpty()) {
+                Bitmap stanceBitmap = BitmapFactory.decodeFile(stanceImagePath);
+                if (stanceBitmap != null) {
+                    ivStanceImagePreview.setImageBitmap(stanceBitmap);
+                }
+            }
+
+            if (!aimPointImagePath.isEmpty()) {
+                Bitmap aimPointBitmap = BitmapFactory.decodeFile(aimPointImagePath);
+                if (aimPointBitmap != null) {
+                    ivAimPointImagePreview.setImageBitmap(aimPointBitmap);
+                }
+            }
+
+            if (!landingPointImagePath.isEmpty()) {
+                Bitmap landingPointBitmap = BitmapFactory.decodeFile(landingPointImagePath);
+                if (landingPointBitmap != null) {
+                    ivLandingPointImagePreview.setImageBitmap(landingPointBitmap);
+                }
+            }
+
+            // 从daoju表中获取道具类型和位置信息
+            MapDAO mapDAO = new MapDAO(this);
+            List<MapDAO.DaojuItem> daojuItems = mapDAO.getAllDaojuItemsByInfoId(daojuInfoId);
+            if (!daojuItems.isEmpty()) {
+                MapDAO.DaojuItem daojuItem = daojuItems.get(0); // 取第一个匹配项
+
+                // 设置道具类型
+                int typeId = daojuItem.getType();
+                switch (typeId) {
+                    case TYPE_SMOKE:
+                        rbSmoke.setChecked(true);
+                        break;
+                    case TYPE_MOLOTOV:
+                        rbMolotov.setChecked(true);
+                        break;
+                    case TYPE_GRENADE:
+                        rbGrenade.setChecked(true);
+                        break;
+                    case TYPE_FLASHBANG:
+                        rbFlashbang.setChecked(true);
+                        break;
+                }
+
+                // 设置位置信息
+                String position = daojuItem.getPosition();
+                if (position != null) {
+                    etPosition.setText(position);
+                }
+            }
+        }
+    }
+// ... existing code ...
+
+
+    // ... existing code ...
+    private void saveDaojuInformation(int daojuInfoId) {
         String throwingMethod = etThrowingMethod.getText().toString().trim();
         String toolName = etToolName.getText().toString().trim();
         String position = etPosition.getText().toString().trim();
+        // position字段在数据库中不存在，所以不需要获取
 
         // 检查输入是否为空
         if (toolName.isEmpty()) {
@@ -238,19 +324,37 @@ public class DaojuInformationActivity extends AppCompatActivity {
         // 获取选中的道具类型
         int daojuType = getTypeFromRadioButton(selectedTypeId);
 
-        // 插入数据到数据库
-        long infoId = daojuInformationDAO.insertDaojuInformation(
-                throwingMethod,
-                stanceImagePath.isEmpty() ? "" : stanceImagePath,
-                aimPointImagePath.isEmpty() ? "" : aimPointImagePath,
-                landingPointImagePath.isEmpty() ? "" : landingPointImagePath,
-                toolName);
+        long result = -1;
+        long daojuResult = -1; // 用于保存daoju表的插入结果
+        // 判断是新增还是更新
+        if (daojuInfoId == -1) {
+            // 新增道具信息
+            result = daojuInformationDAO.insertDaojuInformation(
+                    throwingMethod,
+                    stanceImagePath.isEmpty() ? "" : stanceImagePath,
+                    aimPointImagePath.isEmpty() ? "" : aimPointImagePath,
+                    landingPointImagePath.isEmpty() ? "" : landingPointImagePath,
+                    toolName);
 
-        if (infoId != -1) {
+            // 如果道具信息插入成功，则在daoju表中添加关联记录
+            if (result > 0) {
+                // 插入daoju表记录，关联地图和道具信息
+                MapDAO mapDAO = new MapDAO(this);
+                daojuResult = mapDAO.insertDaoju(selectedMapId, daojuType, position, (int) result);
+            }
+        } else {
+            // 更新数据到数据库
+            result = daojuInformationDAO.updateDaojuInformation(
+                    daojuInfoId,
+                    throwingMethod,
+                    stanceImagePath.isEmpty() ? "" : stanceImagePath,
+                    aimPointImagePath.isEmpty() ? "" : aimPointImagePath,
+                    landingPointImagePath.isEmpty() ? "" : landingPointImagePath,
+                    toolName);
+        }
+
+        if (result > 0) {
             Toast.makeText(this, "道具信息保存成功", Toast.LENGTH_SHORT).show();
-
-            // 为选中的道具类型创建关联记录，使用正确的地图ID
-            mapDAO.insertDaoju(selectedMapId, daojuType, position, (int) infoId);
 
             // 返回DaojuFragment界面
             finish();
@@ -258,6 +362,11 @@ public class DaojuInformationActivity extends AppCompatActivity {
             Toast.makeText(this, "道具信息保存失败", Toast.LENGTH_SHORT).show();
         }
     }
+// ... existing code ...
+
+
+
+
 
     /**
      * 根据选中的单选按钮ID获取对应的道具类型
