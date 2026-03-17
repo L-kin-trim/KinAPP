@@ -1,0 +1,100 @@
+# GitHub 推送指南
+
+## 仓库信息
+- GitHub仓库URL: https://github.com/L-kin-trim/KinAPP
+- 分支: master
+
+## 推送步骤
+
+### 首次推送
+1. 初始化git仓库（如果尚未初始化）
+   ```bash
+   git init
+   ```
+
+2. 添加所有文件到版本控制
+   ```bash
+   git add .
+   ```
+
+3. 提交代码
+   ```bash
+   git commit -m "提交信息"
+   ```
+
+4. 添加远程仓库
+   ```bash
+   git remote add origin https://github.com/L-kin-trim/KinAPP
+   ```
+
+5. 推送到GitHub
+   ```bash
+   git push -u origin master
+   ```
+
+### 后续推送
+1. 添加修改的文件
+   ```bash
+   git add .
+   ```
+
+2. 提交代码
+   ```bash
+   git commit -m "提交信息"
+   ```
+
+3. 推送到GitHub
+   ```bash
+   git push
+   ```
+
+## 常用Git命令
+
+### 查看状态
+```bash
+git status
+```
+
+### 查看日志
+```bash
+git log
+```
+
+### 查看分支
+```bash
+git branch
+```
+
+### 切换分支
+```bash
+git checkout 分支名
+```
+
+### 创建分支
+```bash
+git checkout -b 分支名
+```
+
+### 合并分支
+```bash
+git merge 分支名
+```
+
+### 拉取代码
+```bash
+git pull
+```
+
+## 注意事项
+1. 确保.gitignore文件已正确配置，避免提交不必要的文件
+2. 提交信息应清晰描述本次修改的内容
+3. 推送前确保代码能正常编译和运行
+4. 定期拉取远程代码，避免冲突
+
+## 问题排查
+- 如果推送失败，检查网络连接
+- 如果遇到权限问题，确保GitHub账号有仓库的推送权限
+- 如果遇到分支冲突，先解决冲突再推送
+
+## 联系方式
+- GitHub仓库：https://github.com/L-kin-trim/KinAPP
