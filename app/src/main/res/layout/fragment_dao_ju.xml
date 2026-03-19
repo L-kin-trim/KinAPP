@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#F5F5F5"
     tools:context=".fragment.DaoJuFragment">
 
     <LinearLayout
@@ -13,42 +14,60 @@
             android:layout_width="0dp"
             android:layout_weight="2"
             android:layout_height="match_parent"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:background="#FFFFFF"
+            android:layout_margin="8dp"
+            android:elevation="2dp"
+            android:radius="8dp"
+            android:padding="3dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
-                <ImageButton
+                android:orientation="vertical"
+                android:layout_marginBottom="12dp">
+                <Button
                     android:id="@+id/add_map"
-                    android:layout_width="40sp"
-                    android:layout_height="40sp"
-                    android:scaleType="fitCenter"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="添加地图"
+                    android:textSize="14sp"
+                    android:textColor="#FFFFFF"
                     android:background="@drawable/button_background"
-                    android:src="@drawable/add_ico"
-                    android:layout_marginEnd="10sp"/>
-                <ImageButton
+                    android:layout_marginBottom="8dp"
+                    android:elevation="2dp"
+                    android:paddingHorizontal="4dp"/>
+                <Button
                     android:id="@+id/minus_map"
-                    android:layout_width="35sp"
-                    android:layout_height="40sp"
-                    android:scaleType="fitCenter"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:text="删除地图"
+                    android:textSize="14sp"
+                    android:textColor="#FFFFFF"
                     android:background="@drawable/button_background"
-                    android:src="@drawable/minus_ico"
-                    android:layout_marginStart="10sp"/>
+                    android:elevation="2dp"
+                    android:paddingHorizontal="4dp"/>
             </LinearLayout>
-
 
             <ListView
                 android:id="@+id/list_mapname"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"/>
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:divider="#E0E0E0"
+                android:dividerHeight="1dp"
+                android:scrollbars="vertical"/>
 
         </LinearLayout>
         <LinearLayout
             android:layout_width="0dp"
             android:layout_weight="5"
             android:layout_height="match_parent"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:background="#FFFFFF"
+            android:layout_margin="8dp"
+            android:elevation="2dp"
+            android:radius="8dp"
+            android:padding="12dp">
 
             <!-- 添加全选复选框 -->
             <CheckBox
@@ -57,33 +76,46 @@
                 android:layout_height="wrap_content"
                 android:text="全选"
                 android:layout_margin="8dp"
-                android:visibility="gone" />
+                android:visibility="gone"
+                android:textSize="16sp"
+                android:textColor="#333333"/>
 
             <ListView
                 android:id="@+id/list_daoju"
                 android:layout_width="match_parent"
-                android:layout_height="680sp"/>
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:divider="#F0F0F0"
+                android:dividerHeight="1dp"
+                android:scrollbars="vertical"/>
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="end">
-                <ImageButton
+                android:gravity="end"
+                android:layout_marginTop="12dp">
+                <Button
                     android:id="@+id/minus_daoju"
-                    android:layout_width="35sp"
-                    android:layout_height="40sp"
-                    android:scaleType="fitCenter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:text="删除道具"
+                    android:textSize="14sp"
+                    android:textColor="#FFFFFF"
                     android:background="@drawable/button_background"
-                    android:src="@drawable/minus_ico"
-                    android:layout_marginEnd="10sp"/>
-                <ImageButton
+                    android:layout_marginEnd="12dp"
+                    android:elevation="2dp"
+                    android:paddingHorizontal="16dp"/>
+                <Button
                     android:id="@+id/add_daoju"
-                    android:layout_width="40sp"
-                    android:layout_height="40sp"
-                    android:scaleType="fitCenter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:text="添加道具"
+                    android:textSize="14sp"
+                    android:textColor="#FFFFFF"
                     android:background="@drawable/button_background"
-                    android:src="@drawable/add_ico"
-                    android:layout_marginEnd="10sp"/>
+                    android:layout_marginEnd="4dp"
+                    android:elevation="2dp"
+                    android:paddingHorizontal="16dp"/>
 
             </LinearLayout>
         </LinearLayout>

@@ -98,16 +98,20 @@ public class DaoJuFragment extends Fragment {
         mapNameAdapter = new ArrayAdapter<String>(requireContext(), android.R.layout.simple_list_item_1, mapNames) {
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
-                View view = super.getView(position, convertView, parent);
+                TextView textView = (TextView) super.getView(position, convertView, parent);
+
+                // 设置文字大小，确保至少能容纳五个汉字
+                textView.setTextSize(16);
+                textView.setPadding(16, 20, 16, 20);
 
                 // 如果是选中的项，改变背景色
                 if (position == selectedPosition) {
-                    view.setBackgroundColor(getResources().getColor(android.R.color.darker_gray));
+                    textView.setBackgroundColor(getResources().getColor(android.R.color.darker_gray));
                 } else {
-                    view.setBackgroundColor(getResources().getColor(android.R.color.transparent));
+                    textView.setBackgroundColor(getResources().getColor(android.R.color.transparent));
                 }
 
-                return view;
+                return textView;
             }
         };
 

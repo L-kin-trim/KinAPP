@@ -3,13 +3,17 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:padding="8dp">
+    android:paddingVertical="12dp"
+    android:paddingHorizontal="16dp"
+    android:background="#FFFFFF"
+    android:elevation="0.5dp">
 
     <CheckBox
         android:id="@+id/cb_daoju_select"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
         android:layout_gravity="center_vertical"
+        android:layout_marginEnd="12dp"
         android:visibility="gone" />
 
     <TextView
@@ -18,16 +22,19 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:layout_gravity="center_vertical"
-        android:padding="10dp" />
+        android:textSize="15sp"
+        android:textColor="#333333"
+        android:fontFamily="sans-serif" />
 
     <ImageView
         android:id="@+id/btn_modify"
-        android:layout_width="40sp"
-        android:layout_height="40sp"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
         android:scaleType="fitCenter"
         android:layout_gravity="center_vertical"
         android:src="@drawable/xiugai"
-        android:padding="8dp"
-        android:background="?android:attr/selectableItemBackgroundBorderless" />
+        android:padding="6dp"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:layout_marginStart="8dp" />
 
 </LinearLayout>

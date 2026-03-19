@@ -1,18 +1,25 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal">
+    android:orientation="horizontal"
+    android:background="#F8F8F8"
+    android:paddingVertical="12dp"
+    android:paddingHorizontal="16dp"
+    android:elevation="1dp">
 
     <TextView
         android:id="@+id/tv_group_name"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:padding="10dp" />
+        android:textSize="16sp"
+        android:textColor="#333333"
+        android:fontFamily="sans-serif-medium" />
 
     <ImageView
         android:id="@+id/iv_indicator"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:padding="10dp" />
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_gravity="center_vertical"
+        android:src="@android:drawable/arrow_down_float" />
 </LinearLayout>
