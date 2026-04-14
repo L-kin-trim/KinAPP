@@ -1,0 +1,51 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.Kin" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/kin_accent</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/kin_accent</item>
+        <item name="colorSurface">@color/kin_light_bg</item>
+        <item name="colorSurfaceContainer">@color/kin_light_panel</item>
+        <item name="colorSurfaceVariant">@color/kin_light_panel_alt</item>
+        <item name="colorOnSurface">@color/kin_text</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/kin_light_panel</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="materialCardViewStyle">@style/Widget.Kin.Card</item>
+        <item name="chipStyle">@style/Widget.Kin.Chip</item>
+        <item name="textInputStyle">@style/Widget.Kin.TextInputLayout</item>
+        <item name="android:colorBackground">@color/kin_light_bg</item>
+    </style>
+
+    <style name="Theme.Kin" parent="Base.Theme.Kin" />
+
+    <style name="TextAppearance.Kin.ToolbarTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/kin_text</item>
+        <item name="android:textSize">24sp</item>
+    </style>
+
+    <style name="Widget.Kin.ActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">@color/kin_accent_soft</item>
+        <item name="android:shape">@drawable/bg_nav_indicator</item>
+    </style>
+
+    <style name="Widget.Kin.Card" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardBackgroundColor">@color/kin_light_panel</item>
+        <item name="strokeColor">@color/kin_stroke</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="cardCornerRadius">22dp</item>
+    </style>
+
+    <style name="Widget.Kin.Chip" parent="Widget.Material3.Chip.Assist">
+        <item name="chipBackgroundColor">@color/kin_chip_blue</item>
+        <item name="android:textColor">@color/kin_chip_blue_text</item>
+        <item name="chipCornerRadius">12dp</item>
+    </style>
+
+    <style name="Widget.Kin.TextInputLayout" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxBackgroundColor">@color/kin_light_panel</item>
+        <item name="boxStrokeColor">@color/kin_stroke</item>
+        <item name="hintTextColor">@color/kin_text_muted</item>
+    </style>
+</resources>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="kin_light_bg">#F4F5F7</color>
+    <color name="kin_light_panel">#FCFCFD</color>
+    <color name="kin_light_panel_alt">#EEF1F4</color>
+    <color name="kin_dark_bg">#121416</color>
+    <color name="kin_dark_panel">#191C20</color>
+    <color name="kin_dark_panel_alt">#21252B</color>
+    <color name="kin_text">#151821</color>
+    <color name="kin_text_muted">#6B7280</color>
+    <color name="kin_text_inverse">#F5F7FA</color>
+    <color name="kin_stroke">#D9DEE6</color>
+    <color name="kin_stroke_dark">#30353D</color>
+    <color name="kin_accent">#111827</color>
+    <color name="kin_accent_soft">#E7EBF2</color>
+    <color name="kin_success">#12715B</color>
+    <color name="kin_warning">#B7791F</color>
+    <color name="kin_danger">#C53030</color>
+    <color name="kin_chip_blue">#DCEBFA</color>
+    <color name="kin_chip_blue_text">#1F4B7A</color>
+    <color name="kin_overlay">#0D111780</color>
+</resources>

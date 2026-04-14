@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Kin</string>
+    <string name="nav_home">首页</string>
+    <string name="nav_library">收藏库</string>
+    <string name="nav_publish">发帖</string>
+    <string name="nav_ai">AI推荐</string>
+    <string name="nav_profile">我</string>
+</resources>

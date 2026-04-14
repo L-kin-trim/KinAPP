@@ -1,0 +1,49 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.Kin" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/white</item>
+        <item name="colorOnPrimary">@color/kin_dark_bg</item>
+        <item name="colorSecondary">@color/white</item>
+        <item name="colorSurface">@color/kin_dark_bg</item>
+        <item name="colorSurfaceContainer">@color/kin_dark_panel</item>
+        <item name="colorSurfaceVariant">@color/kin_dark_panel_alt</item>
+        <item name="colorOnSurface">@color/kin_text_inverse</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/kin_dark_panel</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="materialCardViewStyle">@style/Widget.Kin.Card.Dark</item>
+        <item name="chipStyle">@style/Widget.Kin.Chip.Dark</item>
+        <item name="textInputStyle">@style/Widget.Kin.TextInputLayout.Dark</item>
+        <item name="android:colorBackground">@color/kin_dark_bg</item>
+    </style>
+
+    <style name="TextAppearance.Kin.ToolbarTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/kin_text_inverse</item>
+        <item name="android:textSize">24sp</item>
+    </style>
+
+    <style name="Widget.Kin.ActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">@color/kin_dark_panel_alt</item>
+        <item name="android:shape">@drawable/bg_nav_indicator</item>
+    </style>
+
+    <style name="Widget.Kin.Card.Dark" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardBackgroundColor">@color/kin_dark_panel</item>
+        <item name="strokeColor">@color/kin_stroke_dark</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="cardCornerRadius">22dp</item>
+    </style>
+
+    <style name="Widget.Kin.Chip.Dark" parent="Widget.Material3.Chip.Assist">
+        <item name="chipBackgroundColor">@color/kin_dark_panel_alt</item>
+        <item name="android:textColor">@color/kin_text_inverse</item>
+        <item name="chipCornerRadius">12dp</item>
+    </style>
+
+    <style name="Widget.Kin.TextInputLayout.Dark" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxBackgroundColor">@color/kin_dark_panel</item>
+        <item name="boxStrokeColor">@color/kin_stroke_dark</item>
+        <item name="hintTextColor">@color/kin_text_muted</item>
+    </style>
+</resources>
