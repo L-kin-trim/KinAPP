@@ -27,6 +27,9 @@ import com.google.android.material.chip.Chip;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class MessagesActivity extends AppCompatActivity {
     private KinRepository repository;
     private LinearLayout contentLayout;
@@ -37,6 +40,9 @@ public class MessagesActivity extends AppCompatActivity {
     private boolean inboxMode = true;
     private String messageType = "";
     private String readFilter = "ALL";
+    private LinearLayout readFilterRow;
+    private final List<Chip> typeChips = new ArrayList<>();
+    private final List<Chip> readFilterChips = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -87,10 +93,14 @@ public class MessagesActivity extends AppCompatActivity {
         inboxChip.setChecked(true);
         inboxChip.setOnClickListener(v -> {
             inboxMode = true;
+            readFilterRow.setVisibility(View.VISIBLE);
             loadMessages();
         });
         sentChip.setOnClickListener(v -> {
             inboxMode = false;
+            readFilter = "ALL";
+            updateReadFilterSelection();
+            readFilterRow.setVisibility(View.GONE);
             loadMessages();
         });
         tabs.addView(inboxChip);
@@ -101,12 +111,23 @@ public class MessagesActivity extends AppCompatActivity {
 
         LinearLayout filters = new LinearLayout(this);
         filters.setOrientation(LinearLayout.HORIZONTAL);
-        filters.addView(filterChip("全部类型", ""));
-        filters.addView(filterChip("互动提醒", "INTERACTION_REMINDER"));
-        filters.addView(filterChip("审核结果", "REVIEW_RESULT"));
-        filters.addView(filterChip("私信", "DIRECT"));
+        filters.addView(typeChip("全部类型", ""));
+        filters.addView(typeChip("系统通知", "SYSTEM_NOTICE"));
+        filters.addView(typeChip("互动提醒", "INTERACTION_REMINDER"));
+        filters.addView(typeChip("审核结果", "REVIEW_RESULT"));
+        filters.addView(typeChip("私信", "DIRECT"));
         KinUi.margins(filters, this, 0, 12, 0, 0);
         body.addView(filters);
+        updateTypeSelection();
+
+        readFilterRow = new LinearLayout(this);
+        readFilterRow.setOrientation(LinearLayout.HORIZONTAL);
+        readFilterRow.addView(readChip("全部", "ALL"));
+        readFilterRow.addView(readChip("未读", "UNREAD"));
+        readFilterRow.addView(readChip("已读", "READ"));
+        KinUi.margins(readFilterRow, this, 0, 12, 0, 0);
+        body.addView(readFilterRow);
+        updateReadFilterSelection();
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
@@ -135,14 +156,27 @@ public class MessagesActivity extends AppCompatActivity {
         return card;
     }
 
-    private Chip filterChip(String label, String type) {
+    private Chip typeChip(String label, String type) {
         Chip chip = KinUi.chip(this, label);
         chip.setCheckable(true);
         chip.setOnClickListener(v -> {
             messageType = type;
-            readFilter = inboxMode ? readFilter : "ALL";
+            updateTypeSelection();
             loadMessages();
         });
+        typeChips.add(chip);
+        return chip;
+    }
+
+    private Chip readChip(String label, String filter) {
+        Chip chip = KinUi.chip(this, label);
+        chip.setCheckable(true);
+        chip.setOnClickListener(v -> {
+            readFilter = filter;
+            updateReadFilterSelection();
+            loadMessages();
+        });
+        readFilterChips.add(chip);
         return chip;
     }
 
@@ -185,6 +219,28 @@ public class MessagesActivity extends AppCompatActivity {
             repository.getInbox(0, 30, readFilter, messageType, callback);
         } else {
             repository.getSent(0, 30, messageType, callback);
+        }
+    }
+
+    private void updateTypeSelection() {
+        for (Chip chip : typeChips) {
+            String text = String.valueOf(chip.getText());
+            boolean checked = (TextUtils.isEmpty(messageType) && text.contains("全部"))
+                    || ("SYSTEM_NOTICE".equals(messageType) && text.contains("系统通知"))
+                    || ("INTERACTION_REMINDER".equals(messageType) && text.contains("互动提醒"))
+                    || ("REVIEW_RESULT".equals(messageType) && text.contains("审核结果"))
+                    || ("DIRECT".equals(messageType) && text.contains("私信"));
+            chip.setChecked(checked);
+        }
+    }
+
+    private void updateReadFilterSelection() {
+        for (Chip chip : readFilterChips) {
+            String text = String.valueOf(chip.getText());
+            boolean checked = ("ALL".equals(readFilter) && text.contains("全部"))
+                    || ("UNREAD".equals(readFilter) && text.contains("未读"))
+                    || ("READ".equals(readFilter) && text.contains("已读"));
+            chip.setChecked(checked);
         }
     }
 

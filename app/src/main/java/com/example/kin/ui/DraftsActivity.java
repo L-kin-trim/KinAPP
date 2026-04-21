@@ -10,6 +10,7 @@ import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.kin.R;
@@ -95,12 +96,75 @@ public class DraftsActivity extends AppCompatActivity {
         TextView subtitle = KinUi.muted(this, local ? "保存在本地数据库" : "服务端草稿", 13);
         KinUi.margins(subtitle, this, 0, 8, 0, 0);
         body.addView(subtitle);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
         MaterialButton editButton = KinUi.filledButton(this, "继续编辑");
         editButton.setOnClickListener(v -> startActivity(new Intent(this, PublishEditorActivity.class)));
-        KinUi.margins(editButton, this, 0, 14, 0, 0);
-        body.addView(editButton);
+        MaterialButton detailButton = KinUi.outlinedButton(this, "查看详情");
+        detailButton.setOnClickListener(v -> openDraftDetail(draft, local));
+        MaterialButton deleteButton = KinUi.outlinedButton(this, local ? "删除本地" : "删除服务端");
+        deleteButton.setOnClickListener(v -> deleteDraft(draft, local));
+        actions.addView(editButton);
+        actions.addView(detailButton);
+        actions.addView(deleteButton);
+        KinUi.margins(detailButton, this, 10, 0, 0, 0);
+        KinUi.margins(deleteButton, this, 10, 0, 0, 0);
+        KinUi.margins(actions, this, 0, 14, 0, 0);
+        body.addView(actions);
         card.addView(body);
         return card;
+    }
+
+    private void openDraftDetail(DraftModel draft, boolean local) {
+        if (local) {
+            showDraftDetailDialog(draft);
+            return;
+        }
+        repository.getDraftDetail(draft.id, new ApiCallback<>() {
+            @Override
+            public void onSuccess(DraftModel data) {
+                showDraftDetailDialog(data);
+            }
+
+            @Override
+            public void onError(ApiException exception) {
+                setLoading(false, "草稿详情读取失败：" + exception.getMessage());
+            }
+        });
+    }
+
+    private void showDraftDetailDialog(DraftModel draft) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("ID: ").append(draft.id).append('\n');
+        builder.append("标题: ").append(draft.title).append('\n');
+        builder.append("类型: ").append(draft.draftType).append('\n');
+        builder.append("更新时间: ").append(draft.updatedAt).append("\n\n");
+        builder.append(draft.payloadJson);
+        new AlertDialog.Builder(this)
+                .setTitle("草稿详情")
+                .setMessage(builder.toString())
+                .setPositiveButton("关闭", null)
+                .show();
+    }
+
+    private void deleteDraft(DraftModel draft, boolean local) {
+        if (local) {
+            repository.getLocalDraftStore().delete("publish_forum_post");
+            loadDrafts();
+            return;
+        }
+        repository.deleteDraft(draft.id, new ApiCallback<>() {
+            @Override
+            public void onSuccess(org.json.JSONObject data) {
+                loadDrafts();
+            }
+
+            @Override
+            public void onError(ApiException exception) {
+                setLoading(false, "删除草稿失败：" + exception.getMessage());
+            }
+        });
     }
 
     private void setLoading(boolean loading, String message) {

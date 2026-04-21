@@ -150,6 +150,31 @@ public class MessageBoardActivity extends AppCompatActivity {
         TextView content = KinUi.muted(this, entry.content, 14);
         KinUi.margins(content, this, 0, 10, 0, 0);
         body.addView(content);
+        MaterialButton detailButton = KinUi.outlinedButton(this, "查看详情");
+        detailButton.setOnClickListener(v -> repository.getMessageBoardEntry(entry.id, new ApiCallback<>() {
+            @Override
+            public void onSuccess(MessageBoardEntryModel data) {
+                StringBuilder builder = new StringBuilder();
+                builder.append("作者：").append(data.authorUsername).append('\n');
+                builder.append("状态：").append(data.status).append('\n');
+                builder.append("创建时间：").append(data.createdAt).append('\n');
+                builder.append("更新时间：").append(data.updatedAt).append('\n');
+                builder.append("状态备注：").append(TextUtils.isEmpty(data.statusNote) ? "无" : data.statusNote).append("\n\n");
+                builder.append(data.content);
+                new AlertDialog.Builder(MessageBoardActivity.this)
+                        .setTitle("留言详情")
+                        .setMessage(builder.toString())
+                        .setPositiveButton("关闭", null)
+                        .show();
+            }
+
+            @Override
+            public void onError(ApiException exception) {
+                setLoading(false, "留言详情读取失败：" + exception.getMessage());
+            }
+        }));
+        KinUi.margins(detailButton, this, 0, 12, 0, 0);
+        body.addView(detailButton);
         if (mineMode) {
             MaterialButton revokeButton = KinUi.outlinedButton(this, "撤回留言");
             revokeButton.setOnClickListener(v -> repository.revokeMessageBoardEntry(entry.id, "用户主动撤回", new ApiCallback<>() {

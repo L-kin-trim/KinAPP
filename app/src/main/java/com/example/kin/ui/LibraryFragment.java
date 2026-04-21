@@ -154,10 +154,29 @@ public class LibraryFragment extends BasePageFragment {
                 body.addView(strip);
             }
             if (item.forumPostId > 0) {
+                LinearLayout actions = new LinearLayout(activity);
+                actions.setOrientation(LinearLayout.HORIZONTAL);
                 MaterialButton openButton = KinUi.outlinedButton(activity, "打开原帖");
                 openButton.setOnClickListener(v -> activity.openPostDetail(item.forumPostId, false));
-                KinUi.margins(openButton, activity, 0, 12, 0, 0);
-                body.addView(openButton);
+                actions.addView(openButton);
+                if (favoriteMode) {
+                    MaterialButton unfavoriteButton = KinUi.outlinedButton(activity, "取消收藏");
+                    unfavoriteButton.setOnClickListener(v -> activity.getRepository().unfavoritePost(item.forumPostId, new ApiCallback<>() {
+                        @Override
+                        public void onSuccess(com.example.kin.model.FavoriteStatus data) {
+                            loadData(true);
+                        }
+
+                        @Override
+                        public void onError(ApiException exception) {
+                            setLoading(false, "取消收藏失败：" + exception.getMessage());
+                        }
+                    }));
+                    actions.addView(unfavoriteButton);
+                    KinUi.margins(unfavoriteButton, activity, 10, 0, 0, 0);
+                }
+                KinUi.margins(actions, activity, 0, 12, 0, 0);
+                body.addView(actions);
             }
             card.addView(body);
             listContainer.addView(card);

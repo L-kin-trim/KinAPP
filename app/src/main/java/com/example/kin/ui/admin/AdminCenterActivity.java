@@ -49,6 +49,14 @@ public class AdminCenterActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private TextView statusView;
     private final List<ForumPostModel> pendingPosts = new ArrayList<>();
+    private final List<ReviewTemplateModel> templateCache = new ArrayList<>();
+
+    private String postFilterStatus = "PENDING";
+    private String postFilterType = "";
+    private String postFilterMap = "";
+    private String postFilterAuthor = "";
+    private String postFilterFrom = "";
+    private String postFilterTo = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,6 +94,7 @@ public class AdminCenterActivity extends AppCompatActivity {
 
         contentLayout.addView(sectionTitle("帖子审核"));
         contentLayout.addView(buildPostToolsCard());
+        contentLayout.addView(buildPostFilterCard());
         postsLayout = KinUi.vertical(this);
         contentLayout.addView(postsLayout);
 
@@ -142,6 +151,51 @@ public class AdminCenterActivity extends AppCompatActivity {
         body.addView(batchApprove);
         body.addView(batchReject);
         KinUi.margins(batchReject, this, 0, 12, 0, 0);
+        card.addView(body);
+        return card;
+    }
+
+    private View buildPostFilterCard() {
+        MaterialCardView card = KinUi.card(this);
+        LinearLayout body = KinUi.sectionContainer(this, 18);
+        body.addView(KinUi.text(this, "审核筛选", 16, true));
+        TextInputLayout statusLayout = KinUi.inputLayout(this, "状态（默认 PENDING）", false);
+        TextInputLayout typeLayout = KinUi.inputLayout(this, "类型（PROP_SHARE/TACTIC_SHARE...）", false);
+        TextInputLayout mapLayout = KinUi.inputLayout(this, "地图关键词", false);
+        TextInputLayout authorLayout = KinUi.inputLayout(this, "作者关键词", false);
+        TextInputLayout fromLayout = KinUi.inputLayout(this, "开始时间（ISO）", false);
+        TextInputLayout toLayout = KinUi.inputLayout(this, "结束时间（ISO）", false);
+        TextInputEditText statusEdit = KinUi.edit(statusLayout);
+        TextInputEditText typeEdit = KinUi.edit(typeLayout);
+        TextInputEditText mapEdit = KinUi.edit(mapLayout);
+        TextInputEditText authorEdit = KinUi.edit(authorLayout);
+        TextInputEditText fromEdit = KinUi.edit(fromLayout);
+        TextInputEditText toEdit = KinUi.edit(toLayout);
+        statusEdit.setText(postFilterStatus);
+        body.addView(statusLayout);
+        body.addView(typeLayout);
+        body.addView(mapLayout);
+        body.addView(authorLayout);
+        body.addView(fromLayout);
+        body.addView(toLayout);
+        KinUi.margins(typeLayout, this, 0, 10, 0, 0);
+        KinUi.margins(mapLayout, this, 0, 10, 0, 0);
+        KinUi.margins(authorLayout, this, 0, 10, 0, 0);
+        KinUi.margins(fromLayout, this, 0, 10, 0, 0);
+        KinUi.margins(toLayout, this, 0, 10, 0, 0);
+
+        MaterialButton applyButton = KinUi.filledButton(this, "应用筛选");
+        applyButton.setOnClickListener(v -> {
+            postFilterStatus = TextUtils.isEmpty(text(statusEdit)) ? "PENDING" : text(statusEdit);
+            postFilterType = text(typeEdit);
+            postFilterMap = text(mapEdit);
+            postFilterAuthor = text(authorEdit);
+            postFilterFrom = text(fromEdit);
+            postFilterTo = text(toEdit);
+            loadPendingPosts();
+        });
+        KinUi.margins(applyButton, this, 0, 12, 0, 0);
+        body.addView(applyButton);
         card.addView(body);
         return card;
     }
@@ -208,7 +262,16 @@ public class AdminCenterActivity extends AppCompatActivity {
     }
 
     private void loadPendingPosts() {
-        repository.getAdminPosts("PENDING", 0, 10, new ApiCallback<>() {
+        repository.getAdminPosts(
+                postFilterStatus,
+                postFilterType,
+                postFilterMap,
+                postFilterAuthor,
+                postFilterFrom,
+                postFilterTo,
+                0,
+                10,
+                new ApiCallback<>() {
             @Override
             public void onSuccess(PageResult<ForumPostModel> data) {
                 pendingPosts.clear();
@@ -259,11 +322,58 @@ public class AdminCenterActivity extends AppCompatActivity {
         body.addView(summary);
         body.addView(actionRow(
                 buildButton("通过", v -> reviewPost(item.id, "APPROVED", "管理员审核通过")),
-                buildButton("驳回", v -> reviewPost(item.id, "REJECTED", "管理员驳回")),
+                buildButton("驳回", v -> showRejectDialog(item.id)),
                 buildButton("删除", v -> deletePost(item.id))
         ));
         card.addView(body);
         return card;
+    }
+
+    private void showRejectDialog(long postId) {
+        LinearLayout root = KinUi.vertical(this);
+        TextInputLayout remarkLayout = KinUi.inputLayout(this, "驳回备注（可留空，使用模板）", true);
+        TextInputLayout templateLayout = KinUi.inputLayout(this, "模板ID（可选）", false);
+        TextInputEditText remarkEdit = KinUi.edit(remarkLayout);
+        TextInputEditText templateEdit = KinUi.edit(templateLayout);
+        if (!templateCache.isEmpty()) {
+            ReviewTemplateModel first = templateCache.get(0);
+            templateEdit.setText(String.valueOf(first.id));
+            StringBuilder helper = new StringBuilder();
+            helper.append("模板：");
+            for (ReviewTemplateModel model : templateCache) {
+                helper.append(model.id).append("-").append(model.templateName).append("  ");
+            }
+            TextView tips = KinUi.muted(this, helper.toString(), 12);
+            KinUi.margins(tips, this, 0, 8, 0, 0);
+            root.addView(tips);
+        }
+        root.addView(remarkLayout);
+        root.addView(templateLayout);
+        KinUi.margins(remarkLayout, this, 0, 10, 0, 0);
+        KinUi.margins(templateLayout, this, 0, 10, 0, 0);
+        new AlertDialog.Builder(this)
+                .setTitle("驳回帖子")
+                .setView(root)
+                .setPositiveButton("提交", (dialog, which) -> {
+                    long templateId = 0L;
+                    try {
+                        templateId = Long.parseLong(text(templateEdit));
+                    } catch (Exception ignored) {
+                    }
+                    repository.reviewPost(postId, "REJECTED", text(remarkEdit), templateId, new ApiCallback<>() {
+                        @Override
+                        public void onSuccess(ForumPostModel data) {
+                            loadPendingPosts();
+                        }
+
+                        @Override
+                        public void onError(ApiException exception) {
+                            setLoading(false, "驳回失败：" + exception.getMessage());
+                        }
+                    });
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 
     private void reviewPost(long postId, String status, String remark) {
@@ -424,6 +534,27 @@ public class AdminCenterActivity extends AppCompatActivity {
         TextView content = KinUi.muted(this, item.content, 14);
         KinUi.margins(content, this, 0, 8, 0, 0);
         body.addView(content);
+        MaterialButton detailButton = KinUi.outlinedButton(this, "查看详情");
+        detailButton.setOnClickListener(v -> repository.getAdminMessageBoardEntry(item.id, new ApiCallback<>() {
+            @Override
+            public void onSuccess(MessageBoardEntryModel data) {
+                StringBuilder builder = new StringBuilder();
+                builder.append("作者：").append(data.authorUsername).append('\n');
+                builder.append("状态：").append(data.status).append('\n');
+                builder.append("创建时间：").append(data.createdAt).append('\n');
+                builder.append("更新时间：").append(data.updatedAt).append('\n');
+                builder.append("状态备注：").append(TextUtils.isEmpty(data.statusNote) ? "无" : data.statusNote).append("\n\n");
+                builder.append(data.content);
+                showTextDialog("留言详情", builder.toString());
+            }
+
+            @Override
+            public void onError(ApiException exception) {
+                setLoading(false, "留言详情读取失败：" + exception.getMessage());
+            }
+        }));
+        KinUi.margins(detailButton, this, 0, 10, 0, 0);
+        body.addView(detailButton);
         body.addView(actionRow(
                 buildButton("采纳", v -> updateBoard(item.id, "ADOPTED")),
                 buildButton("已实现", v -> updateBoard(item.id, "IMPLEMENTED")),
@@ -463,12 +594,14 @@ public class AdminCenterActivity extends AppCompatActivity {
 
     private void loadTemplates() {
         templatesLayout.removeAllViews();
+        templateCache.clear();
         MaterialButton addButton = KinUi.filledButton(this, "新增模板");
         addButton.setOnClickListener(v -> showTemplateDialog(null));
         templatesLayout.addView(addButton);
         repository.getReviewTemplates(false, new ApiCallback<>() {
             @Override
             public void onSuccess(List<ReviewTemplateModel> data) {
+                templateCache.addAll(data);
                 for (ReviewTemplateModel item : data) {
                     templatesLayout.addView(templateCard(item));
                 }
