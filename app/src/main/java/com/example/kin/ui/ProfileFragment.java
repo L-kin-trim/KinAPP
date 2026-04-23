@@ -28,7 +28,7 @@ public class ProfileFragment extends BasePageFragment {
 
     private void render() {
         MainActivity activity = (MainActivity) requireActivity();
-        activity.setTopBar("我的", "");
+        activity.setTopBar("Me", "");
         contentLayout.removeAllViews();
         contentLayout.addView(progressBar);
         contentLayout.addView(statusView);
@@ -44,13 +44,13 @@ public class ProfileFragment extends BasePageFragment {
     private View profileCard(MainActivity activity, SessionManager sessionManager, SessionUser user) {
         MaterialCardView card = KinUi.card(activity);
         LinearLayout body = KinUi.sectionContainer(activity, 18);
-        body.addView(KinUi.text(activity, sessionManager.isLoggedIn() ? user.username : "未登录", 24, true));
+        body.addView(KinUi.text(activity, sessionManager.isLoggedIn() ? user.username : "Guest", 24, true));
         TextView subtitle = KinUi.muted(activity,
-                sessionManager.isLoggedIn() ? ("角色：" + user.role + " · 用户ID " + user.id) : "登录后可发布、评论、收藏、发送消息。",
+                sessionManager.isLoggedIn() ? ("Role: " + user.role + " | User ID " + user.id) : "Sign in to post, comment, favorite, and message.",
                 14);
         KinUi.margins(subtitle, activity, 0, 8, 0, 0);
         body.addView(subtitle);
-        TextView endpoint = KinUi.muted(activity, "服务地址：" + sessionManager.getBaseUrl(), 13);
+        TextView endpoint = KinUi.muted(activity, "Server: " + sessionManager.getBaseUrl(), 13);
         KinUi.margins(endpoint, activity, 0, 12, 0, 0);
         body.addView(endpoint);
         card.addView(body);
@@ -61,25 +61,27 @@ public class ProfileFragment extends BasePageFragment {
         MaterialCardView card = KinUi.card(activity);
         LinearLayout body = KinUi.sectionContainer(activity, 18);
 
-        body.addView(actionButton(activity, sessionManager.isLoggedIn() ? "切换账号" : "登录 / 注册",
+        body.addView(actionButton(activity, sessionManager.isLoggedIn() ? "Switch Account" : "Sign In / Register",
                 v -> startActivity(new Intent(activity, AuthActivity.class))));
-        body.addView(actionButton(activity, "我的主页",
+        body.addView(actionButton(activity, "AI Model Settings",
+                v -> startActivity(new Intent(activity, AiSettingsActivity.class))));
+        body.addView(actionButton(activity, "My Profile",
                 v -> startActivity(new Intent(activity, UserProfileActivity.class))));
-        body.addView(actionButton(activity, "草稿箱",
+        body.addView(actionButton(activity, "Drafts",
                 v -> startActivity(new Intent(activity, DraftsActivity.class))));
-        body.addView(actionButton(activity, "消息中心",
+        body.addView(actionButton(activity, "Messages",
                 v -> startActivity(new Intent(activity, MessagesActivity.class))));
-        body.addView(actionButton(activity, "留言板",
+        body.addView(actionButton(activity, "Message Board",
                 v -> startActivity(new Intent(activity, MessageBoardActivity.class))));
-        body.addView(actionButton(activity, "我的举报",
+        body.addView(actionButton(activity, "My Reports",
                 v -> startActivity(new Intent(activity, MyReportsActivity.class))));
         if (user.isAdmin()) {
-            body.addView(actionButton(activity, "管理员中心",
+            body.addView(actionButton(activity, "Admin Center",
                     v -> startActivity(new Intent(activity, AdminCenterActivity.class))));
         }
         if (sessionManager.isLoggedIn()) {
-            body.addView(actionButton(activity, "退出登录", v -> {
-                sessionManager.clearSession();
+            body.addView(actionButton(activity, "Sign Out", v -> {
+                activity.getRepository().logout();
                 activity.refreshToolbarSubtitle();
                 startActivity(new Intent(activity, AuthActivity.class));
             }));

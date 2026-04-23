@@ -15,4 +15,5 @@ public class SessionEntity {
     public String role = "USER";
     public long loggedInAt;
     public long updatedAt;
+    public long expiresAt;
 }

@@ -381,3 +381,155 @@
 - 完成当前 Android 客户端项目的全量初始梳理与基线总结
 - 后续所有功能迭代、重构、修复将在此文件持续更新
 
+
+### V1 (2026-04-23)
+
+#### Scope
+Implemented the full V1 package in one release:
+- brand icon refresh
+- bottom navigation height optimization and direct tab switching
+- 30-day session keepalive with encrypted remembered credentials
+- local dual-model OCR (Latin + Chinese) with structured scoreboard extraction
+- dedicated AI settings page with provider presets
+- AI recommendation strategy upgrade (local library/favorites first, then general CS2 knowledge)
+
+#### 1) Brand and Navigation UX
+- Replaced launcher foreground with a centered pure-black crown and kept adaptive icon wiring unchanged:
+  - @mipmap/ic_launcher and @mipmap/ic_launcher_round still point to adaptive icon XML.
+  - foreground vector now renders crown at roughly 70% width / 50% height visual footprint.
+- Updated launcher background to light gray-white layered style matching app base tone.
+- Reduced bottom navigation visual height:
+  - decreased container padding in g_bottom_bar.xml
+  - tuned item top/bottom paddings and min height in ctivity_main.xml
+- Eliminated intermediate page slide behavior during tab jumps:
+  - all setCurrentItem(..., true) changed to alse
+  - includes switchToPublish() and bottom-nav selection handling
+- Added top-right AI settings entry in main toolbar via menu_main_top.xml.
+
+#### 2) Session Keepalive (30 Days)
+- Extended local session model:
+  - SessionEntity added expiresAt
+  - DB version bumped 1 -> 2 in KinDatabase
+- SessionManager now enforces expiry-based login validity:
+  - isLoggedIn() only true when token exists and expiresAt is valid
+  - expired session is cleared automatically
+  - session TTL is fixed at 30 days (SESSION_TTL_MS)
+- Added encrypted remembered-credential store:
+  - new LoginCredentialStore using EncryptedSharedPreferences (fallback to normal preferences if needed)
+  - persists username/password + credential expiry
+- Updated login flow in KinRepository:
+  - login(...) now supports remember behavior
+  - successful login stores both session and encrypted remembered credentials
+- Added silent auto-login API:
+  - KinRepository.tryAutoLogin(...)
+- Added unified logout:
+  - KinRepository.logout() clears session + encrypted remembered credentials
+- Startup/resume behavior:
+  - LaunchActivity now attempts silent auto-login when no active token
+  - MainActivity.onResume() attempts session restore before forcing auth screen
+- Manual sign-out semantics preserved:
+  - profile sign-out uses repository logout and requires explicit re-login.
+
+#### 3) Local OCR Upgrade (Scoreboard Structuring)
+- Added Chinese OCR dependency:
+  - com.google.mlkit:text-recognition-chinese
+- New orchestrator:
+  - ScoreboardOcrOrchestrator
+  - runs Latin and Chinese recognizers locally, merges outputs, then calls parser
+- Expanded scoreboard model:
+  - ScoreboardSnapshot now includes:
+    - map name
+    - dual raw text fields (latinRawText, chineseRawText)
+    - player structured summary
+    - hot-hand summary
+    - structured player list (PlayerStat with K/D/A/money)
+- Reworked parser (ScoreboardParser):
+  - score extraction
+  - money extraction
+  - K/D/A extraction
+  - map alias matching (EN + CN aliases via unicode escapes)
+  - heuristic player assembly
+  - hot-hand candidate summary
+- AI page now displays structured OCR results, not only raw OCR text.
+
+#### 4) AI Configuration and Recommendation Strategy
+- Added dedicated AiSettingsActivity:
+  - provider preset selector
+  - baseUrl / apiKey / model / system prompt
+  - preset auto-fill + manual override
+- Added profile entry (Me page) to open AI settings.
+- Added top toolbar settings entry from main container.
+- AiConfig extended with providerId.
+- AiConfigStore now persists provider id in encrypted storage.
+- Added provider preset registry (AiProviderPreset) with defaults:
+  - Tongyi (Qwen)
+  - OpenAI
+  - Claude (OpenAI-compatible route)
+  - Doubao
+  - DeepSeek
+- AI recommendation page behavior changes:
+  - when model config is missing, shows a feed-like reminder card guiding user to settings
+  - recommendation request now injects prioritized local context from:
+    - user library records
+    - favorites
+  - local candidates are ranked by map/type relevance before prompt injection
+  - when local match score is weak, prompt explicitly allows model to fill with general CS2 knowledge
+  - first release intentionally does not connect external search API.
+
+#### 5) Streaming Prompt Chain Upgrade
+- OpenAiStreamClient extended:
+  - new streamScoreboardAdvice(..., libraryContext, ...) overload
+  - user prompt now includes:
+    - structured OCR fields
+    - hot-hand signal
+    - local library priority context
+    - explicit fallback behavior
+- Maintained backward compatibility by keeping old method signature overload.
+
+#### 6) Files Added
+- pp/src/main/java/com/example/kin/data/LoginCredentialStore.java
+- pp/src/main/java/com/example/kin/model/AiProviderPreset.java
+- pp/src/main/java/com/example/kin/ui/AiSettingsActivity.java
+- pp/src/main/java/com/example/kin/util/ScoreboardOcrOrchestrator.java
+- pp/src/main/res/menu/menu_main_top.xml
+
+#### 7) Files Updated (Core)
+- pp/src/main/java/com/example/kin/MainActivity.java
+- pp/src/main/java/com/example/kin/ui/LaunchActivity.java
+- pp/src/main/java/com/example/kin/ui/ProfileFragment.java
+- pp/src/main/java/com/example/kin/ui/AiRecommendFragment.java
+- pp/src/main/java/com/example/kin/data/KinRepository.java
+- pp/src/main/java/com/example/kin/data/SessionManager.java
+- pp/src/main/java/com/example/kin/data/AiConfigStore.java
+- pp/src/main/java/com/example/kin/model/AiConfig.java
+- pp/src/main/java/com/example/kin/model/ScoreboardSnapshot.java
+- pp/src/main/java/com/example/kin/util/ScoreboardParser.java
+- pp/src/main/java/com/example/kin/net/OpenAiStreamClient.java
+- pp/src/main/java/com/example/kin/data/local/SessionEntity.java
+- pp/src/main/java/com/example/kin/data/local/KinDatabase.java
+- pp/src/main/res/layout/activity_main.xml
+- pp/src/main/res/drawable/bg_bottom_bar.xml
+- pp/src/main/res/drawable/ic_launcher_foreground.xml
+- pp/src/main/AndroidManifest.xml
+- pp/build.gradle
+- gradle/libs.versions.toml
+- pp/src/test/java/com/example/kin/ScoreboardParserTest.java
+
+#### 8) Verification Result
+- Unit tests:
+  - command: ./gradlew.bat testDebugUnitTest
+  - result: PASS
+- Debug build:
+  - command: ./gradlew.bat assembleDebug
+  - result: PASS
+- Noted build warning:
+  - libmlkit_google_ocr_pipeline.so strip warning (packaged as-is), no build block.
+
+#### 9) Behavior Outcome Checklist
+- Icon style updated to light background + black crown: done
+- Bottom nav visually reduced: done
+- Cross-tab jump no intermediate swipe animation: done
+- Session persistence for 30 days + silent restore + logout clear: done
+- OCR local enhanced extraction (score/map/user/money/KDA/hot-hand): done
+- AI settings entry from top-right and Me page: done
+- AI recommendation local-library-first prompt strategy: done

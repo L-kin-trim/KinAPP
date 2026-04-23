@@ -10,6 +10,7 @@ import com.example.kin.model.AiConfig;
 
 public class AiConfigStore {
     private static final String FILE_NAME = "ai_config_secure";
+    private static final String KEY_PROVIDER_ID = "provider_id";
     private static final String KEY_BASE_URL = "base_url";
     private static final String KEY_API_KEY = "api_key";
     private static final String KEY_MODEL = "model";
@@ -23,6 +24,7 @@ public class AiConfigStore {
 
     public AiConfig load() {
         AiConfig config = new AiConfig();
+        config.providerId = preferences.getString(KEY_PROVIDER_ID, "");
         config.baseUrl = preferences.getString(KEY_BASE_URL, "");
         config.apiKey = preferences.getString(KEY_API_KEY, "");
         config.model = preferences.getString(KEY_MODEL, "");
@@ -32,6 +34,7 @@ public class AiConfigStore {
 
     public void save(AiConfig config) {
         preferences.edit()
+                .putString(KEY_PROVIDER_ID, safe(config.providerId))
                 .putString(KEY_BASE_URL, safe(config.baseUrl))
                 .putString(KEY_API_KEY, safe(config.apiKey))
                 .putString(KEY_MODEL, safe(config.model))

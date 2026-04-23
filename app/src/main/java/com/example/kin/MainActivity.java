@@ -15,7 +15,10 @@ import androidx.viewpager2.widget.ViewPager2;
 
 import com.example.kin.data.KinRepository;
 import com.example.kin.model.SessionUser;
+import com.example.kin.net.ApiCallback;
+import com.example.kin.net.ApiException;
 import com.example.kin.ui.AiRecommendFragment;
+import com.example.kin.ui.AiSettingsActivity;
 import com.example.kin.ui.AuthActivity;
 import com.example.kin.ui.HomeFragment;
 import com.example.kin.ui.LibraryFragment;
@@ -39,6 +42,8 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
     private ViewPager2 viewPager;
     private BottomNavigationView bottomNavigationView;
     private List<Fragment> rootFragments;
+    private boolean autoLoginInFlight;
+
     private final int[] navIds = new int[]{
             R.id.nav_home,
             R.id.nav_library,
@@ -73,6 +78,14 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
         topBar = findViewById(R.id.topBar);
         topBar.setNavigationIcon(null);
         topBar.setTitle("Kin");
+        topBar.inflateMenu(R.menu.menu_main_top);
+        topBar.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == R.id.action_ai_settings) {
+                openAiSettings();
+                return true;
+            }
+            return false;
+        });
 
         bottomNavigationView = findViewById(R.id.bottomNavigation);
         bottomNavigationView.setOnItemSelectedListener(this);
@@ -101,9 +114,7 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
         super.onResume();
         refreshToolbarSubtitle();
         updateToolbarForPage(viewPager.getCurrentItem());
-        if (!repository.getSessionManager().isLoggedIn()) {
-            startActivity(new Intent(this, AuthActivity.class));
-        }
+        ensureSessionAlive();
     }
 
     public KinRepository getRepository() {
@@ -122,7 +133,7 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
     public void refreshToolbarSubtitle() {
         SessionUser user = repository.getSessionManager().getUser();
         String subtitle = repository.getSessionManager().isLoggedIn()
-                ? user.username + " · " + user.role
+                ? user.username + " | " + user.role
                 : "";
         topBar.setSubtitle(subtitle);
     }
@@ -142,8 +153,12 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
         startActivity(new Intent(this, AdminCenterActivity.class));
     }
 
+    public void openAiSettings() {
+        startActivity(new Intent(this, AiSettingsActivity.class));
+    }
+
     public void switchToPublish() {
-        viewPager.setCurrentItem(2, true);
+        viewPager.setCurrentItem(2, false);
     }
 
     @Override
@@ -152,7 +167,7 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
         for (int i = 0; i < navIds.length; i++) {
             if (navIds[i] == itemId) {
                 if (viewPager.getCurrentItem() != i) {
-                    viewPager.setCurrentItem(i, true);
+                    viewPager.setCurrentItem(i, false);
                 } else {
                     updateToolbarForPage(i);
                 }
@@ -163,8 +178,36 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
     }
 
     private void updateToolbarForPage(int position) {
-        String[] titles = {"首页", "资料库", "发布", "AI 推荐", "我的"};
+        String[] titles = {"Home", "Library", "Publish", "AI", "Me"};
         setTopBar(titles[position], "");
         refreshToolbarSubtitle();
+    }
+
+    private void ensureSessionAlive() {
+        if (repository.getSessionManager().isLoggedIn() || autoLoginInFlight) {
+            return;
+        }
+        autoLoginInFlight = true;
+        topBar.setSubtitle("Restoring session...");
+        repository.tryAutoLogin(new ApiCallback<>() {
+            @Override
+            public void onSuccess(SessionUser data) {
+                autoLoginInFlight = false;
+                refreshToolbarSubtitle();
+            }
+
+            @Override
+            public void onError(ApiException exception) {
+                autoLoginInFlight = false;
+                openAuthAndFinish();
+            }
+        });
+    }
+
+    private void openAuthAndFinish() {
+        Intent intent = new Intent(this, AuthActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        startActivity(intent);
+        finish();
     }
 }

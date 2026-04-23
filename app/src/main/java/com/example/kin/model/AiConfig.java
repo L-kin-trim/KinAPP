@@ -1,6 +1,7 @@
 package com.example.kin.model;
 
 public class AiConfig {
+    public String providerId = "";
     public String baseUrl = "";
     public String apiKey = "";
     public String model = "";

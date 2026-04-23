@@ -14,8 +14,12 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class OpenAiStreamClient {
+    private static final Pattern DELTA_CONTENT_PATTERN = Pattern.compile("\"content\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
+
     public interface StreamListener {
         void onStart();
 
@@ -51,9 +55,17 @@ public class OpenAiStreamClient {
                                                 ScoreboardSnapshot snapshot,
                                                 String note,
                                                 StreamListener listener) {
+        return streamScoreboardAdvice(config, snapshot, note, "", listener);
+    }
+
+    public StreamSession streamScoreboardAdvice(AiConfig config,
+                                                ScoreboardSnapshot snapshot,
+                                                String note,
+                                                String libraryContext,
+                                                StreamListener listener) {
         StreamSession session = new StreamSession();
         AppExecutors.main(listener::onStart);
-        AppExecutors.io().execute(() -> runStream(session, config, snapshot, note, listener));
+        AppExecutors.io().execute(() -> runStream(session, config, snapshot, note, libraryContext, listener));
         return session;
     }
 
@@ -61,6 +73,7 @@ public class OpenAiStreamClient {
                            AiConfig config,
                            ScoreboardSnapshot snapshot,
                            String note,
+                           String libraryContext,
                            StreamListener listener) {
         HttpURLConnection connection = null;
         try {
@@ -74,7 +87,8 @@ public class OpenAiStreamClient {
             connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
             connection.setRequestProperty("Authorization", "Bearer " + config.apiKey);
 
-            byte[] payload = buildPayload(config, snapshot, note).toString().getBytes(StandardCharsets.UTF_8);
+            byte[] payload = buildPayload(config, snapshot, note, libraryContext)
+                    .toString().getBytes(StandardCharsets.UTF_8);
             connection.setFixedLengthStreamingMode(payload.length);
             try (OutputStream outputStream = connection.getOutputStream()) {
                 outputStream.write(payload);
@@ -84,11 +98,11 @@ public class OpenAiStreamClient {
             InputStream stream = status >= 200 && status < 300 ? connection.getInputStream() : connection.getErrorStream();
             if (status < 200 || status >= 300) {
                 String error = readText(stream);
-                postError(listener, isEmpty(error) ? "AI 请求失败：" + status : error);
+                postError(listener, isEmpty(error) ? "AI request failed: HTTP " + status : error);
                 return;
             }
             if (stream == null) {
-                postError(listener, "AI 响应为空。");
+                postError(listener, "AI response is empty.");
                 return;
             }
 
@@ -109,7 +123,7 @@ public class OpenAiStreamClient {
             }
         } catch (Exception exception) {
             if (!session.isCanceled()) {
-                postError(listener, exception.getMessage() == null ? "AI 流式请求失败。" : exception.getMessage());
+                postError(listener, exception.getMessage() == null ? "AI stream failed." : exception.getMessage());
             }
         } finally {
             if (connection != null) {
@@ -118,7 +132,10 @@ public class OpenAiStreamClient {
         }
     }
 
-    private JSONObject buildPayload(AiConfig config, ScoreboardSnapshot snapshot, String note) throws Exception {
+    private JSONObject buildPayload(AiConfig config,
+                                    ScoreboardSnapshot snapshot,
+                                    String note,
+                                    String libraryContext) throws Exception {
         JSONObject root = new JSONObject();
         root.put("model", config.model);
         root.put("stream", true);
@@ -127,31 +144,45 @@ public class OpenAiStreamClient {
         JSONObject system = new JSONObject();
         system.put("role", "system");
         system.put("content", isEmpty(config.systemPrompt)
-                ? "你是 CS2 助手。结合比分、经济和战绩，给出起枪建议、站位和战术执行建议，输出简明、可执行。"
+                ? "You are a CS2 tactical assistant. Prioritize the user's own utility/tactic library first. "
+                + "If local matches are weak, supplement with general CS2 knowledge. "
+                + "Provide concise and actionable output."
                 : config.systemPrompt);
         messages.put(system);
 
         JSONObject user = new JSONObject();
         user.put("role", "user");
-        user.put("content", buildUserPrompt(snapshot, note));
+        user.put("content", buildUserPrompt(snapshot, note, libraryContext));
         messages.put(user);
 
         root.put("messages", messages);
         return root;
     }
 
-    private String buildUserPrompt(ScoreboardSnapshot snapshot, String note) {
+    private String buildUserPrompt(ScoreboardSnapshot snapshot, String note, String libraryContext) {
         StringBuilder builder = new StringBuilder();
-        builder.append("请基于当前计分板信息给出下一回合建议。\n");
-        builder.append("比分：").append(empty(snapshot.scoreText)).append('\n');
-        builder.append("经济：").append(empty(snapshot.moneyText)).append('\n');
-        builder.append("战绩：").append(empty(snapshot.kdaText)).append('\n');
-        builder.append("补充信息：").append(isEmpty(note) ? "无" : note).append('\n');
-        builder.append("OCR原文：\n").append(empty(snapshot.rawText)).append('\n');
-        builder.append("请按以下结构输出：\n");
-        builder.append("1) 推荐起枪与道具\n");
-        builder.append("2) 进攻/防守战术建议\n");
-        builder.append("3) 风险提示与备选方案");
+        builder.append("Please recommend the next CS2 round plan based on this scoreboard snapshot.\n\n");
+        builder.append("[Structured OCR]\n");
+        builder.append("Map: ").append(empty(snapshot.mapName)).append('\n');
+        builder.append("Score: ").append(empty(snapshot.scoreText)).append('\n');
+        builder.append("Money: ").append(empty(snapshot.moneyText)).append('\n');
+        builder.append("K/D/A: ").append(empty(snapshot.kdaText)).append('\n');
+        builder.append("Player Summary:\n").append(empty(snapshot.playerStatsText)).append('\n');
+        builder.append("Hot Hand: ").append(empty(snapshot.hotHandSummary)).append('\n');
+        builder.append("Extra Note: ").append(isEmpty(note) ? "N/A" : note).append("\n\n");
+
+        builder.append("[Local Library Priority Context]\n");
+        builder.append(isEmpty(libraryContext)
+                ? "No strong local match. You may use general CS2 tactical knowledge to fill gaps."
+                : libraryContext);
+        builder.append("\n\n");
+
+        builder.append("[Raw OCR Text]\n").append(empty(snapshot.rawText)).append("\n\n");
+        builder.append("Output format:\n");
+        builder.append("1) Buy + utility recommendation\n");
+        builder.append("2) Execute/defense plan\n");
+        builder.append("3) Risk + backup plan\n");
+        builder.append("4) Explain whether recommendations came from local library or general knowledge\n");
         return builder.toString();
     }
 
@@ -175,6 +206,10 @@ public class OpenAiStreamClient {
         if (isEmpty(data) || "[DONE]".equals(data)) {
             return "";
         }
+        String regexHit = matchDeltaContent(data);
+        if (!isEmpty(regexHit)) {
+            return regexHit;
+        }
         try {
             JSONObject json = new JSONObject(data);
             JSONArray choices = json.optJSONArray("choices");
@@ -195,6 +230,18 @@ public class OpenAiStreamClient {
         }
     }
 
+    private static String matchDeltaContent(String data) {
+        Matcher matcher = DELTA_CONTENT_PATTERN.matcher(data);
+        if (!matcher.find()) {
+            return "";
+        }
+        String content = matcher.group(1);
+        if (content == null) {
+            return "";
+        }
+        return content.replace("\\n", "\n").replace("\\\"", "\"");
+    }
+
     private String readText(InputStream stream) {
         if (stream == null) {
             return "";
@@ -212,11 +259,11 @@ public class OpenAiStreamClient {
     }
 
     private void postError(StreamListener listener, String message) {
-        AppExecutors.main(() -> listener.onError(isEmpty(message) ? "AI 请求失败。" : message));
+        AppExecutors.main(() -> listener.onError(isEmpty(message) ? "AI request failed." : message));
     }
 
     private String empty(String value) {
-        return isEmpty(value) ? "未识别" : value;
+        return isEmpty(value) ? "N/A" : value;
     }
 
     private static boolean isEmpty(String value) {

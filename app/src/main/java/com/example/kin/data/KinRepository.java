@@ -40,12 +40,14 @@ public class KinRepository {
     private final Context appContext;
     private final ApiClient apiClient;
     private final SessionManager sessionManager;
+    private final LoginCredentialStore loginCredentialStore;
     private final LocalDraftStore localDraftStore;
 
     public KinRepository(Context context) {
         this.appContext = context.getApplicationContext();
         this.apiClient = new ApiClient(appContext);
         this.sessionManager = new SessionManager(appContext);
+        this.loginCredentialStore = new LoginCredentialStore(appContext);
         this.localDraftStore = new LocalDraftStore(appContext);
     }
 
@@ -58,6 +60,10 @@ public class KinRepository {
     }
 
     public void login(String username, String password, ApiCallback<SessionUser> callback) {
+        login(username, password, true, callback);
+    }
+
+    public void login(String username, String password, boolean remember, ApiCallback<SessionUser> callback) {
         JSONObject body = new JSONObject();
         try {
             body.put("username", username);
@@ -69,6 +75,11 @@ public class KinRepository {
             public void onSuccess(JSONObject data) {
                 SessionUser user = JsonUtils.parseSessionUser(data.optJSONObject("user"));
                 sessionManager.saveSession(data.optString("token"), user);
+                if (remember) {
+                    loginCredentialStore.save(username, password, sessionManager.buildSessionExpiryFromNow());
+                } else {
+                    loginCredentialStore.clear();
+                }
                 callback.onSuccess(user);
             }
 
@@ -77,6 +88,20 @@ public class KinRepository {
                 callback.onError(exception);
             }
         });
+    }
+
+    public void tryAutoLogin(ApiCallback<SessionUser> callback) {
+        LoginCredentialStore.Credentials credentials = loginCredentialStore.load();
+        if (credentials == null || !credentials.isValid()) {
+            callback.onError(new ApiException(401, "No remembered credentials"));
+            return;
+        }
+        login(credentials.username, credentials.password, true, callback);
+    }
+
+    public void logout() {
+        sessionManager.clearSession();
+        loginCredentialStore.clear();
     }
 
     public void register(String username, String password, String email, ApiCallback<SessionUser> callback) {

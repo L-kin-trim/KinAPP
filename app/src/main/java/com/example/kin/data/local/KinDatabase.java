@@ -6,7 +6,7 @@ import androidx.room.Database;
 import androidx.room.Room;
 import androidx.room.RoomDatabase;
 
-@Database(entities = {SessionEntity.class, LocalDraftEntity.class}, version = 1, exportSchema = false)
+@Database(entities = {SessionEntity.class, LocalDraftEntity.class}, version = 2, exportSchema = false)
 public abstract class KinDatabase extends RoomDatabase {
     private static volatile KinDatabase instance;
 

@@ -12,6 +12,7 @@ viewpager2 = "1.1.0"
 room = "2.6.1"
 securityCrypto = "1.1.0-alpha06"
 mlkitTextRecognition = "16.0.1"
+mlkitTextRecognitionChinese = "16.0.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -27,6 +28,7 @@ room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
+mlkit-text-recognition-chinese = { group = "com.google.mlkit", name = "text-recognition-chinese", version.ref = "mlkitTextRecognitionChinese" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

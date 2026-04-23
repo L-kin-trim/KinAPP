@@ -14,6 +14,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Kin"
         android:usesCleartextTraffic="true">
+        <activity android:name=".ui.AiSettingsActivity" />
         <activity android:name=".ui.admin.AdminCenterActivity" />
         <activity android:name=".ui.MessagesActivity" />
         <activity android:name=".ui.PostDetailActivity" />

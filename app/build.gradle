@@ -38,6 +38,7 @@ dependencies {
     implementation libs.room.runtime
     implementation libs.security.crypto
     implementation libs.mlkit.text.recognition
+    implementation libs.mlkit.text.recognition.chinese
     annotationProcessor libs.room.compiler
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
