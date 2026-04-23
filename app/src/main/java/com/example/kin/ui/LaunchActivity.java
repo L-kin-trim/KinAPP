@@ -34,7 +34,7 @@ public class LaunchActivity extends AppCompatActivity {
         progressParams.gravity = Gravity.CENTER;
         root.addView(progressBar, progressParams);
 
-        TextView status = KinUi.muted(this, "Checking session...", 14);
+        TextView status = KinUi.muted(this, "\u6b63\u5728\u68c0\u67e5\u767b\u5f55\u72b6\u6001...", 14);
         FrameLayout.LayoutParams statusParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT

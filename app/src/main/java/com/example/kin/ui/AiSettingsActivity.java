@@ -45,7 +45,7 @@ public class AiSettingsActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         configStore = new AiConfigStore(this);
-        setTitle("AI Model Settings");
+        setTitle("AI \u6a21\u578b\u914d\u7f6e");
         setContentView(buildContentView());
         bindConfig(configStore.load());
     }
@@ -69,12 +69,12 @@ public class AiSettingsActivity extends AppCompatActivity {
 
         MaterialCardView card = KinUi.card(this);
         LinearLayout body = KinUi.sectionContainer(this, 18);
-        body.addView(KinUi.text(this, "AI Recommendation Config", 22, true));
-        TextView subtitle = KinUi.muted(this, "Recommendations use local library first, then model general knowledge.", 14);
+        body.addView(KinUi.text(this, "AI \u63a8\u8350\u914d\u7f6e", 22, true));
+        TextView subtitle = KinUi.muted(this, "\u63a8\u8350\u4f1a\u4f18\u5148\u4f7f\u7528\u672c\u5730\u5e93\u5185\u5bb9\uff0c\u518d\u7531\u5927\u6a21\u578b\u8865\u5168\u3002", 14);
         KinUi.margins(subtitle, this, 0, 8, 0, 0);
         body.addView(subtitle);
 
-        TextView providerLabel = KinUi.muted(this, "Provider Preset", 13);
+        TextView providerLabel = KinUi.muted(this, "\u9884\u7f6e\u670d\u52a1\u5546", 13);
         KinUi.margins(providerLabel, this, 0, 14, 0, 0);
         body.addView(providerLabel);
 
@@ -107,16 +107,16 @@ public class AiSettingsActivity extends AppCompatActivity {
         KinUi.margins(providerNoteView, this, 0, 8, 0, 0);
         body.addView(providerNoteView);
 
-        baseUrlEdit = addInput(body, "Base URL");
-        apiKeyEdit = addInput(body, "API Key");
-        modelEdit = addInput(body, "Model");
-        systemPromptEdit = addInput(body, "System Prompt (optional)", true);
+        baseUrlEdit = addInput(body, "\u63a5\u53e3\u5730\u5740");
+        apiKeyEdit = addInput(body, "\u5bc6\u94a5");
+        modelEdit = addInput(body, "\u6a21\u578b");
+        systemPromptEdit = addInput(body, "\u7cfb\u7edf\u63d0\u793a\u8bcd\uff08\u53ef\u9009\uff09", true);
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
-        MaterialButton applyPresetButton = KinUi.outlinedButton(this, "Apply Preset");
+        MaterialButton applyPresetButton = KinUi.outlinedButton(this, "\u5e94\u7528\u9884\u7f6e");
         applyPresetButton.setOnClickListener(v -> applySelectedPreset());
-        MaterialButton saveButton = KinUi.filledButton(this, "Save Config");
+        MaterialButton saveButton = KinUi.filledButton(this, "\u4fdd\u5b58\u914d\u7f6e");
         saveButton.setOnClickListener(v -> saveConfig());
         actions.addView(applyPresetButton);
         actions.addView(saveButton);
@@ -138,7 +138,7 @@ public class AiSettingsActivity extends AppCompatActivity {
         content.addView(card);
 
         TextView hint = KinUi.muted(this,
-                "Note: Claude preset uses an OpenAI-compatible route. Replace base URL if needed.",
+                "\u63d0\u793a\uff1aClaude \u9884\u7f6e\u4f7f\u7528 OpenAI \u517c\u5bb9\u8def\u7531\uff0c\u53ef\u6839\u636e\u9700\u8981\u66ff\u6362\u63a5\u53e3\u5730\u5740\u3002",
                 12);
         hint.setGravity(Gravity.CENTER_HORIZONTAL);
         content.addView(hint);
@@ -184,7 +184,7 @@ public class AiSettingsActivity extends AppCompatActivity {
         baseUrlEdit.setText(preset.baseUrl);
         modelEdit.setText(preset.model);
         providerNoteView.setText(preset.note);
-        status("Preset applied: " + preset.label);
+        status("\u5df2\u5e94\u7528\u9884\u7f6e\uff1a" + preset.label);
     }
 
     private void saveConfig() {
@@ -198,12 +198,12 @@ public class AiSettingsActivity extends AppCompatActivity {
         config.systemPrompt = text(systemPromptEdit);
         if (!config.isValid()) {
             progress(false);
-            status("Please fill Base URL, API Key and Model.");
+            status("\u8bf7\u586b\u5199\u63a5\u53e3\u5730\u5740\u3001\u5bc6\u94a5\u548c\u6a21\u578b\u3002");
             return;
         }
         configStore.save(config);
         progress(false);
-        status("AI config saved.");
+        status("AI \u914d\u7f6e\u5df2\u4fdd\u5b58\u3002");
     }
 
     private void progress(boolean loading) {

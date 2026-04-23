@@ -36,6 +36,7 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class PostDetailActivity extends AppCompatActivity {
     public static final String EXTRA_POST_ID = "extra_post_id";
@@ -401,14 +402,14 @@ public class PostDetailActivity extends AppCompatActivity {
         TextInputLayout detailLayout = KinUi.inputLayout(this, "补充说明", true);
         TextInputEditText reasonEdit = KinUi.edit(reasonLayout);
         TextInputEditText detailEdit = KinUi.edit(detailLayout);
-        reasonEdit.setText("VIOLATION");
+        reasonEdit.setText("违规");
         root.addView(reasonLayout);
         root.addView(detailLayout);
         KinUi.margins(detailLayout, this, 0, 12, 0, 0);
         new AlertDialog.Builder(this)
                 .setTitle("提交举报")
                 .setView(root)
-                .setPositiveButton("提交", (dialog, which) -> repository.createReport(targetType, targetId, text(reasonEdit), text(detailEdit), new ApiCallback<>() {
+                .setPositiveButton("提交", (dialog, which) -> repository.createReport(targetType, targetId, normalizeReportReason(text(reasonEdit)), text(detailEdit), new ApiCallback<>() {
                     @Override
                     public void onSuccess(com.example.kin.model.ReportModel data) {
                         setLoading(false, "举报已提交。");
@@ -568,5 +569,23 @@ public class PostDetailActivity extends AppCompatActivity {
 
     private String text(TextInputEditText editText) {
         return String.valueOf(editText.getText()).trim();
+    }
+
+    private String normalizeReportReason(String rawReason) {
+        if (TextUtils.isEmpty(rawReason)) {
+            return "VIOLATION";
+        }
+        String reason = rawReason.trim();
+        String upper = reason.toUpperCase(Locale.ROOT);
+        if (upper.matches("[A-Z_]+")) {
+            return upper;
+        }
+        if (reason.contains("广告") || reason.contains("引流")) {
+            return "SPAM";
+        }
+        if (reason.contains("辱骂") || reason.contains("骚扰")) {
+            return "ABUSE";
+        }
+        return "VIOLATION";
     }
 }

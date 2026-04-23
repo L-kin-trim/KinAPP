@@ -41,7 +41,7 @@ public class ScoreboardSnapshot {
         }
 
         public String pretty() {
-            String moneyText = money > 0 ? ("$" + money) : "N/A";
+            String moneyText = money > 0 ? ("$" + money) : "未知";
             return username + " K/D/A " + kills + "/" + deaths + "/" + assists + " | " + moneyText;
         }
     }

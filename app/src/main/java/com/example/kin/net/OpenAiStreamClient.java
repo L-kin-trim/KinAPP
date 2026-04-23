@@ -98,11 +98,11 @@ public class OpenAiStreamClient {
             InputStream stream = status >= 200 && status < 300 ? connection.getInputStream() : connection.getErrorStream();
             if (status < 200 || status >= 300) {
                 String error = readText(stream);
-                postError(listener, isEmpty(error) ? "AI request failed: HTTP " + status : error);
+                postError(listener, isEmpty(error) ? "AI 请求失败，HTTP 状态码：" + status : error);
                 return;
             }
             if (stream == null) {
-                postError(listener, "AI response is empty.");
+                postError(listener, "AI 返回为空。");
                 return;
             }
 
@@ -123,7 +123,7 @@ public class OpenAiStreamClient {
             }
         } catch (Exception exception) {
             if (!session.isCanceled()) {
-                postError(listener, exception.getMessage() == null ? "AI stream failed." : exception.getMessage());
+                postError(listener, exception.getMessage() == null ? "AI 流式请求失败。" : exception.getMessage());
             }
         } finally {
             if (connection != null) {
@@ -144,9 +144,9 @@ public class OpenAiStreamClient {
         JSONObject system = new JSONObject();
         system.put("role", "system");
         system.put("content", isEmpty(config.systemPrompt)
-                ? "You are a CS2 tactical assistant. Prioritize the user's own utility/tactic library first. "
-                + "If local matches are weak, supplement with general CS2 knowledge. "
-                + "Provide concise and actionable output."
+                ? "你是 CS2 战术助手。请优先使用用户自建的道具库和战术库。"
+                + "若本地匹配较弱，再用通用 CS2 知识补全建议。"
+                + "输出请简洁、可执行。"
                 : config.systemPrompt);
         messages.put(system);
 
@@ -161,28 +161,28 @@ public class OpenAiStreamClient {
 
     private String buildUserPrompt(ScoreboardSnapshot snapshot, String note, String libraryContext) {
         StringBuilder builder = new StringBuilder();
-        builder.append("Please recommend the next CS2 round plan based on this scoreboard snapshot.\n\n");
-        builder.append("[Structured OCR]\n");
-        builder.append("Map: ").append(empty(snapshot.mapName)).append('\n');
-        builder.append("Score: ").append(empty(snapshot.scoreText)).append('\n');
-        builder.append("Money: ").append(empty(snapshot.moneyText)).append('\n');
-        builder.append("K/D/A: ").append(empty(snapshot.kdaText)).append('\n');
-        builder.append("Player Summary:\n").append(empty(snapshot.playerStatsText)).append('\n');
-        builder.append("Hot Hand: ").append(empty(snapshot.hotHandSummary)).append('\n');
-        builder.append("Extra Note: ").append(isEmpty(note) ? "N/A" : note).append("\n\n");
+        builder.append("请基于当前计分板信息给出下一回合建议。\n\n");
+        builder.append("[OCR 结构化]\n");
+        builder.append("地图：").append(empty(snapshot.mapName)).append('\n');
+        builder.append("比分：").append(empty(snapshot.scoreText)).append('\n');
+        builder.append("经济：").append(empty(snapshot.moneyText)).append('\n');
+        builder.append("战绩：").append(empty(snapshot.kdaText)).append('\n');
+        builder.append("玩家统计：\n").append(empty(snapshot.playerStatsText)).append('\n');
+        builder.append("手感候选：").append(empty(snapshot.hotHandSummary)).append('\n');
+        builder.append("补充信息：").append(isEmpty(note) ? "无" : note).append("\n\n");
 
-        builder.append("[Local Library Priority Context]\n");
+        builder.append("[本地库优先上下文]\n");
         builder.append(isEmpty(libraryContext)
-                ? "No strong local match. You may use general CS2 tactical knowledge to fill gaps."
+                ? "本地匹配较弱，可用通用 CS2 战术知识补全。"
                 : libraryContext);
         builder.append("\n\n");
 
-        builder.append("[Raw OCR Text]\n").append(empty(snapshot.rawText)).append("\n\n");
-        builder.append("Output format:\n");
-        builder.append("1) Buy + utility recommendation\n");
-        builder.append("2) Execute/defense plan\n");
-        builder.append("3) Risk + backup plan\n");
-        builder.append("4) Explain whether recommendations came from local library or general knowledge\n");
+        builder.append("[OCR 原文]\n").append(empty(snapshot.rawText)).append("\n\n");
+        builder.append("输出格式：\n");
+        builder.append("1) 起枪与道具建议\n");
+        builder.append("2) 进攻/防守执行建议\n");
+        builder.append("3) 风险提示与备选方案\n");
+        builder.append("4) 说明建议来源（本地库优先还是通用知识）\n");
         return builder.toString();
     }
 
@@ -259,11 +259,11 @@ public class OpenAiStreamClient {
     }
 
     private void postError(StreamListener listener, String message) {
-        AppExecutors.main(() -> listener.onError(isEmpty(message) ? "AI request failed." : message));
+        AppExecutors.main(() -> listener.onError(isEmpty(message) ? "AI 请求失败。" : message));
     }
 
     private String empty(String value) {
-        return isEmpty(value) ? "N/A" : value;
+        return isEmpty(value) ? "无" : value;
     }
 
     private static boolean isEmpty(String value) {

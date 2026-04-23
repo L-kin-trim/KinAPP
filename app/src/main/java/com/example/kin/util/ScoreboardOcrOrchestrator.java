@@ -36,7 +36,7 @@ public class ScoreboardOcrOrchestrator {
                         String chineseText = readTaskText(chineseTask);
                         String merged = mergeTexts(latinText, chineseText);
                         if (TextUtils.isEmpty(merged)) {
-                            callback.onError("OCR did not detect readable text.");
+                            callback.onError("OCR 未识别到可读文本。");
                         } else {
                             ScoreboardSnapshot snapshot = ScoreboardParser.parse(merged);
                             snapshot.latinRawText = latinText;
@@ -49,10 +49,10 @@ public class ScoreboardOcrOrchestrator {
                     .addOnFailureListener(exception -> {
                         latinRecognizer.close();
                         chineseRecognizer.close();
-                        callback.onError(exception.getMessage() == null ? "OCR failed." : exception.getMessage());
+                        callback.onError(exception.getMessage() == null ? "OCR 识别失败。" : exception.getMessage());
                     });
         } catch (Exception exception) {
-            callback.onError(exception.getMessage() == null ? "OCR prepare failed." : exception.getMessage());
+            callback.onError(exception.getMessage() == null ? "OCR 初始化失败。" : exception.getMessage());
         }
     }
 

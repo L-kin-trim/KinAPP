@@ -14,34 +14,34 @@ public class AiProviderPreset {
         List<AiProviderPreset> presets = new ArrayList<>();
         presets.add(create(
                 "tongyi",
-                "Tongyi (Qwen)",
+                "\u901a\u4e49\u5343\u95ee",
                 "https://dashscope.aliyuncs.com/compatible-mode",
                 "qwen-plus",
-                "Alibaba Bailian OpenAI-compatible route"));
+                "\u963f\u91cc\u767e\u70bc OpenAI \u517c\u5bb9\u8def\u7531"));
         presets.add(create(
                 "openai",
                 "OpenAI",
                 "https://api.openai.com",
                 "gpt-4o-mini",
-                "Official OpenAI API"));
+                "OpenAI \u5b98\u65b9\u63a5\u53e3"));
         presets.add(create(
                 "claude",
-                "Claude (compatible)",
+                "Claude (\u517c\u5bb9\u8def\u7531)",
                 "https://openrouter.ai/api",
                 "anthropic/claude-3.7-sonnet",
-                "Claude via OpenAI-compatible gateway"));
+                "\u901a\u8fc7 OpenAI \u517c\u5bb9\u7f51\u5173\u8c03\u7528 Claude"));
         presets.add(create(
                 "doubao",
-                "Doubao",
+                "\u8c46\u5305",
                 "https://ark.cn-beijing.volces.com/api",
                 "doubao-seed-1-6-250615",
-                "Volcengine Ark OpenAI-compatible route"));
+                "\u706b\u5c71\u5f15\u64ce Ark OpenAI \u517c\u5bb9\u8def\u7531"));
         presets.add(create(
                 "deepseek",
                 "DeepSeek",
                 "https://api.deepseek.com",
                 "deepseek-chat",
-                "Official DeepSeek OpenAI-compatible endpoint"));
+                "DeepSeek \u5b98\u65b9 OpenAI \u517c\u5bb9\u63a5\u53e3"));
         return presets;
     }
 

@@ -161,7 +161,7 @@ public class ApiClient {
                 JSONObject error = parseBody(responseText);
                 String message = error.optString("message");
                 if (TextUtils.isEmpty(message)) {
-                    message = TextUtils.isEmpty(responseText) ? "request failed" : responseText;
+                    message = TextUtils.isEmpty(responseText) ? "请求失败" : responseText;
                 }
                 postError(callback, new ApiException(status, message));
             } catch (Exception exception) {
@@ -194,7 +194,7 @@ public class ApiClient {
         JSONObject error = parseBody(body);
         String message = error.optString("message");
         if (TextUtils.isEmpty(message)) {
-            message = TextUtils.isEmpty(body) ? "request failed" : body;
+            message = TextUtils.isEmpty(body) ? "请求失败" : body;
         }
         postError(callback, new ApiException(status, message));
     }
@@ -267,7 +267,7 @@ public class ApiClient {
     }
 
     private String safeMessage(Exception exception) {
-        return exception.getMessage() == null ? "network error" : exception.getMessage();
+        return exception.getMessage() == null ? "网络异常" : exception.getMessage();
     }
 
     public static class MultipartPart {

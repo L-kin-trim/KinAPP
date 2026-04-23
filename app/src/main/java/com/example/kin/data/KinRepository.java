@@ -93,7 +93,7 @@ public class KinRepository {
     public void tryAutoLogin(ApiCallback<SessionUser> callback) {
         LoginCredentialStore.Credentials credentials = loginCredentialStore.load();
         if (credentials == null || !credentials.isValid()) {
-            callback.onError(new ApiException(401, "No remembered credentials"));
+            callback.onError(new ApiException(401, "无可用的记住我凭证"));
             return;
         }
         login(credentials.username, credentials.password, true, callback);

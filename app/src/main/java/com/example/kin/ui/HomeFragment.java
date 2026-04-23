@@ -27,6 +27,7 @@ import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class HomeFragment extends BasePageFragment {
     private final List<ForumPostModel> posts = new ArrayList<>();
@@ -270,35 +271,38 @@ public class HomeFragment extends BasePageFragment {
 
             LinearLayout actions = new LinearLayout(activity);
             actions.setOrientation(LinearLayout.HORIZONTAL);
-            MaterialButton detailButton = KinUi.filledButton(activity, "详情");
+            actions.setWeightSum(4f);
+            MaterialButton detailButton = KinUi.filledButton(activity, "\u8be6\u60c5");
             detailButton.setOnClickListener(v -> activity.openPostDetail(post.id,
                     TextUtils.equals(post.createdByUsername, activity.getRepository().getSessionManager().getUser().username)));
-            MaterialButton likeButton = KinUi.outlinedButton(activity, "点赞 " + post.likeCount);
+            MaterialButton likeButton = KinUi.outlinedButton(activity, "\u70b9\u8d5e " + post.likeCount);
             likeButton.setOnClickListener(v -> toggleLike(post, likeButton));
-            MaterialButton favoriteButton = KinUi.outlinedButton(activity, "收藏");
+            MaterialButton favoriteButton = KinUi.outlinedButton(activity, "\u6536\u85cf");
             favoriteButton.setOnClickListener(v -> activity.getRepository().favoritePost(post.id, new ApiCallback<>() {
                 @Override
                 public void onSuccess(com.example.kin.model.FavoriteStatus data) {
-                    favoriteButton.setText(data.favorited ? "已收藏" : "收藏");
+                    favoriteButton.setText(data.favorited ? "\u5df2\u6536\u85cf" : "\u6536\u85cf");
                 }
 
                 @Override
                 public void onError(ApiException exception) {
-                    favoriteButton.setText("收藏失败");
+                    favoriteButton.setText("\u6536\u85cf\u5931\u8d25");
                 }
             }));
-            MaterialButton reportButton = KinUi.outlinedButton(activity, "举报");
+            MaterialButton reportButton = KinUi.outlinedButton(activity, "\u4e3e\u62a5");
             reportButton.setOnClickListener(v -> showReportDialog(post.id));
+
+            applyPostActionButtonStyle(activity, detailButton, 0);
+            applyPostActionButtonStyle(activity, likeButton, 10);
+            applyPostActionButtonStyle(activity, favoriteButton, 10);
+            applyPostActionButtonStyle(activity, reportButton, 10);
+
             actions.addView(detailButton);
             actions.addView(likeButton);
             actions.addView(favoriteButton);
             actions.addView(reportButton);
-            KinUi.margins(likeButton, activity, 10, 0, 0, 0);
-            KinUi.margins(favoriteButton, activity, 10, 0, 0, 0);
-            KinUi.margins(reportButton, activity, 10, 0, 0, 0);
             KinUi.margins(actions, activity, 0, 14, 0, 0);
             body.addView(actions);
-
             card.addView(body);
             listContainer.addView(card);
         }
@@ -330,19 +334,19 @@ public class HomeFragment extends BasePageFragment {
     private void showReportDialog(long postId) {
         MainActivity activity = (MainActivity) requireActivity();
         LinearLayout root = KinUi.vertical(activity);
-        TextInputLayout reasonLayout = KinUi.inputLayout(activity, "举报原因类型（如 VIOLATION）", false);
+        TextInputLayout reasonLayout = KinUi.inputLayout(activity, "举报原因类型（如：违规）", false);
         TextInputLayout detailLayout = KinUi.inputLayout(activity, "补充说明", true);
         TextInputEditText reasonEdit = KinUi.edit(reasonLayout);
         TextInputEditText detailEdit = KinUi.edit(detailLayout);
         root.addView(reasonLayout);
         root.addView(detailLayout);
         KinUi.margins(detailLayout, activity, 0, 12, 0, 0);
-        reasonEdit.setText("VIOLATION");
+        reasonEdit.setText("违规");
         new AlertDialog.Builder(activity)
                 .setTitle("举报帖子")
                 .setView(root)
                 .setPositiveButton("提交", (dialog, which) -> activity.getRepository().createReport(
-                        "POST", postId, stringValue(reasonEdit), stringValue(detailEdit), new ApiCallback<>() {
+                        "POST", postId, normalizeReportReason(stringValue(reasonEdit)), stringValue(detailEdit), new ApiCallback<>() {
                             @Override
                             public void onSuccess(com.example.kin.model.ReportModel data) {
                                 setLoading(false, "举报已提交。");
@@ -400,5 +404,36 @@ public class HomeFragment extends BasePageFragment {
 
     private String stringValue(TextInputEditText editText) {
         return String.valueOf(editText.getText()).trim();
+    }
+
+    private String normalizeReportReason(String rawReason) {
+        if (TextUtils.isEmpty(rawReason)) {
+            return "VIOLATION";
+        }
+        String reason = rawReason.trim();
+        String upper = reason.toUpperCase(Locale.ROOT);
+        if (upper.matches("[A-Z_]+")) {
+            return upper;
+        }
+        if (reason.contains("广告") || reason.contains("引流")) {
+            return "SPAM";
+        }
+        if (reason.contains("辱骂") || reason.contains("骚扰")) {
+            return "ABUSE";
+        }
+        return "VIOLATION";
+    }
+
+    private void applyPostActionButtonStyle(MainActivity activity, MaterialButton button, int leftMarginDp) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+        );
+        params.leftMargin = KinUi.dp(activity, leftMarginDp);
+        button.setLayoutParams(params);
+        button.setMaxLines(1);
+        button.setInsetTop(KinUi.dp(activity, 6));
+        button.setInsetBottom(KinUi.dp(activity, 6));
     }
 }

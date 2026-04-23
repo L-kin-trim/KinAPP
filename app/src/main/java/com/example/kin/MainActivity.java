@@ -178,7 +178,7 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
     }
 
     private void updateToolbarForPage(int position) {
-        String[] titles = {"Home", "Library", "Publish", "AI", "Me"};
+        String[] titles = {"\u9996\u9875", "\u8d44\u6599\u5e93", "\u53d1\u5e16", "AI\u63a8\u8350", "\u6211"};
         setTopBar(titles[position], "");
         refreshToolbarSubtitle();
     }
@@ -188,7 +188,7 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
             return;
         }
         autoLoginInFlight = true;
-        topBar.setSubtitle("Restoring session...");
+        topBar.setSubtitle("\u6b63\u5728\u6062\u590d\u767b\u5f55...");
         repository.tryAutoLogin(new ApiCallback<>() {
             @Override
             public void onSuccess(SessionUser data) {

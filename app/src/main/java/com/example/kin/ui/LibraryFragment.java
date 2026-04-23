@@ -187,7 +187,7 @@ public class LibraryFragment extends BasePageFragment {
     private void showCreateDialog() {
         MainActivity activity = (MainActivity) requireActivity();
         LinearLayout root = KinUi.vertical(activity);
-        TextInputLayout typeLayout = KinUi.inputLayout(activity, "类型：PROP_SHARE 或 TACTIC_SHARE", false);
+        TextInputLayout typeLayout = KinUi.inputLayout(activity, "类型（道具/战术）", false);
         TextInputLayout mapLayout = KinUi.inputLayout(activity, "地图名", false);
         TextInputLayout titleLayout = KinUi.inputLayout(activity, "标题/名称", false);
         TextInputLayout descLayout = KinUi.inputLayout(activity, "描述", true);
@@ -203,7 +203,7 @@ public class LibraryFragment extends BasePageFragment {
         TextInputEditText mapEdit = KinUi.edit(mapLayout);
         TextInputEditText titleEdit = KinUi.edit(titleLayout);
         TextInputEditText descEdit = KinUi.edit(descLayout);
-        typeEdit.setText("PROP_SHARE");
+        typeEdit.setText("道具");
 
         new AlertDialog.Builder(activity)
                 .setTitle("新建个人条目")
@@ -211,7 +211,7 @@ public class LibraryFragment extends BasePageFragment {
                 .setPositiveButton("保存", (dialog, which) -> {
                     try {
                         JSONObject payload = new JSONObject();
-                        String type = stringValue(typeEdit);
+                        String type = normalizeLibraryType(stringValue(typeEdit));
                         payload.put("postType", type);
                         payload.put("mapName", stringValue(mapEdit));
                         if ("TACTIC_SHARE".equals(type)) {
@@ -282,5 +282,16 @@ public class LibraryFragment extends BasePageFragment {
 
     private String stringValue(TextInputEditText editText) {
         return String.valueOf(editText.getText()).trim();
+    }
+
+    private String normalizeLibraryType(String rawType) {
+        if (TextUtils.isEmpty(rawType)) {
+            return "PROP_SHARE";
+        }
+        String type = rawType.trim();
+        if ("TACTIC_SHARE".equalsIgnoreCase(type) || type.contains("战术")) {
+            return "TACTIC_SHARE";
+        }
+        return "PROP_SHARE";
     }
 }

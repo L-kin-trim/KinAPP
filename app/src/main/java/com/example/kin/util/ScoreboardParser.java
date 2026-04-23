@@ -136,7 +136,7 @@ public final class ScoreboardParser {
         List<ScoreboardSnapshot.PlayerStat> players = new ArrayList<>();
         for (int i = 0; i < count && i < 10; i++) {
             ScoreboardSnapshot.PlayerStat stat = new ScoreboardSnapshot.PlayerStat();
-            stat.username = i < names.size() ? names.get(i) : ("Player" + (i + 1));
+            stat.username = i < names.size() ? names.get(i) : ("玩家" + (i + 1));
             if (i < moneyValues.size()) {
                 stat.money = moneyValues.get(i);
             }
@@ -186,7 +186,7 @@ public final class ScoreboardParser {
         if (best == null) {
             return "";
         }
-        return best.username + " is hot: K/D/A "
+        return best.username + " 手感较热: K/D/A "
                 + best.kills + "/" + best.deaths + "/" + best.assists
                 + " (KD " + String.format(Locale.US, "%.2f", best.kdRatio()) + ")";
     }

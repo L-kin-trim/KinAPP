@@ -533,3 +533,40 @@ Implemented the full V1 package in one release:
 - OCR local enhanced extraction (score/map/user/money/KDA/hot-hand): done
 - AI settings entry from top-right and Me page: done
 - AI recommendation local-library-first prompt strategy: done
+
+
+### V1.1 (2026-04-23)
+
+#### Scope
+- 全项目提示文案进一步中文化（聚焦用户可见提示）
+- 修复首页帖子卡片操作区“举报按钮被挤没”的布局问题
+
+#### 1) 中文提示完善
+- `HomeFragment`：
+  - 举报弹窗提示由“VIOLATION 示例”改为中文“违规”示例
+  - 举报提交前新增中文原因到后端枚举的映射（兼容 `VIOLATION/SPAM/ABUSE`）
+- `PostDetailActivity`：
+  - 举报弹窗默认原因改为中文“违规”
+  - 举报提交前新增同样的原因映射逻辑，避免用户必须输入英文枚举
+- `LibraryFragment`：
+  - 新建条目类型提示从英文枚举改为中文“道具/战术”
+  - 输入中文类型时自动映射到后端 `PROP_SHARE/TACTIC_SHARE`
+- `AiSettingsActivity`：
+  - 表单提示改为中文（接口地址/密钥/模型）
+  - 保存校验与说明文案改为中文表达
+- `AiRecommendFragment`：
+  - 地图示例提示改为中文示例（如“沙二”）
+  - 本地库上下文拼接字段 `map=` 改为中文 `地图=`
+- `ApiClient`：
+  - 通用网络兜底错误文案改为中文（`请求失败`、`网络异常`）
+
+#### 2) 举报按钮挤压修复
+- `HomeFragment` 帖子操作行改为等宽布局：
+  - 操作容器设置 `weightSum=4`
+  - `详情/点赞/收藏/举报` 四个按钮统一 `width=0 + weight=1`
+  - 统一按钮内边距与单行显示，避免右侧按钮被挤出
+- 结果：在窄屏下四个按钮均可见，举报按钮不再被压缩为半截
+
+#### 3) 验证结果
+- `./gradlew.bat testDebugUnitTest`：通过
+- `./gradlew.bat assembleDebug`：通过
