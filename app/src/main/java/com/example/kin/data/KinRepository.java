@@ -1,14 +1,20 @@
 package com.example.kin.data;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.text.TextUtils;
 
 import com.example.kin.model.AuditLogModel;
+import com.example.kin.model.CheckInSummary;
 import com.example.kin.model.DraftModel;
 import com.example.kin.model.FavoriteStatus;
 import com.example.kin.model.ForumCommentModel;
 import com.example.kin.model.ForumPostModel;
+import com.example.kin.model.FutureAsyncTask;
+import com.example.kin.model.FutureFeatureDefinition;
+import com.example.kin.model.FutureFeatureRecord;
+import com.example.kin.model.FutureFeatureRegistry;
 import com.example.kin.model.HotKeywordModel;
 import com.example.kin.model.ImageUploadItem;
 import com.example.kin.model.LikeStatusModel;
@@ -37,6 +43,9 @@ import java.util.List;
 import java.util.Map;
 
 public class KinRepository {
+    private static final String AUTO_CHECKIN_PREFS = "kin_auto_checkin";
+    private static final String KEY_LAST_AUTO_CHECKIN_ATTEMPT_DATE = "last_auto_checkin_attempt_date";
+
     private final Context appContext;
     private final ApiClient apiClient;
     private final SessionManager sessionManager;
@@ -664,6 +673,180 @@ public class KinRepository {
         apiClient.get(path, null, true, modelCallback(callback, JsonUtils::parseUserProfile));
     }
 
+    public void getCheckInSummary(ApiCallback<CheckInSummary> callback) {
+        apiClient.get("/api/users/checkins/summary", null, true, modelCallback(callback, JsonUtils::parseCheckInSummary));
+    }
+
+    public void checkInToday(ApiCallback<CheckInSummary> callback) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("clientDate", java.time.LocalDate.now().toString());
+        } catch (Exception ignored) {
+        }
+        apiClient.postJson("/api/users/checkins/today", body, true, modelCallback(callback, JsonUtils::parseCheckInSummary));
+    }
+
+    public boolean shouldAutoCheckInToday() {
+        if (!sessionManager.isLoggedIn()) {
+            return false;
+        }
+        String today = java.time.LocalDate.now().toString();
+        return !TextUtils.equals(today, autoCheckInPrefs().getString(KEY_LAST_AUTO_CHECKIN_ATTEMPT_DATE, ""));
+    }
+
+    public void markAutoCheckInAttemptedToday() {
+        autoCheckInPrefs()
+                .edit()
+                .putString(KEY_LAST_AUTO_CHECKIN_ATTEMPT_DATE, java.time.LocalDate.now().toString())
+                .apply();
+    }
+
+    private SharedPreferences autoCheckInPrefs() {
+        return appContext.getSharedPreferences(AUTO_CHECKIN_PREFS, Context.MODE_PRIVATE);
+    }
+
+    public void getFutureCatalog(ApiCallback<JSONObject> callback) {
+        apiClient.get("/api/features/catalog", null, true, callback);
+    }
+
+    public void getFutureRecords(String featureKey, String featureGroup, String ownerUsername, String status,
+                                 ApiCallback<List<FutureFeatureRecord>> callback) {
+        FutureFeatureDefinition feature = FutureFeatureRegistry.featureByKey(featureKey);
+        if (feature != null) {
+            getFutureRecords(feature, ownerUsername, status, callback);
+            return;
+        }
+        Map<String, String> query = new LinkedHashMap<>();
+        query.put("featureKey", featureKey);
+        query.put("ownerUsername", ownerUsername);
+        query.put("status", status);
+        query.put("page", "0");
+        query.put("size", "20");
+        String prefix = futureApiPrefix(featureGroup);
+        apiClient.get(prefix + "/records", query, true, listCallback(callback, JsonUtils::parseFutureRecord));
+    }
+
+    public void getFutureRecords(FutureFeatureDefinition feature,
+                                 String ownerUsername,
+                                 String status,
+                                 ApiCallback<List<FutureFeatureRecord>> callback) {
+        Map<String, String> query = new LinkedHashMap<>();
+        query.put("featureKey", feature.apiFeatureKey);
+        query.put("ownerUsername", ownerUsername);
+        query.put("status", status);
+        query.put("page", "0");
+        query.put("size", "20");
+        apiClient.get(futureApiPrefix(feature) + "/records", query, true, listCallback(callback, JsonUtils::parseFutureRecord));
+    }
+
+    public void getFutureRecord(FutureFeatureDefinition feature, long recordId, ApiCallback<FutureFeatureRecord> callback) {
+        apiClient.get(futureApiPrefix(feature) + "/records/" + recordId, null, true, modelCallback(callback, JsonUtils::parseFutureRecord));
+    }
+
+    public void getFutureRecord(long recordId, ApiCallback<FutureFeatureRecord> callback) {
+        apiClient.get("/api/content/records/" + recordId, null, true, modelCallback(callback, JsonUtils::parseFutureRecord));
+    }
+
+    public void createFutureRecord(FutureFeatureDefinition feature,
+                                   String title,
+                                   String summary,
+                                   JSONObject payload,
+                                   ApiCallback<FutureFeatureRecord> callback) {
+        JSONObject body = futureRecordBody(feature, title, summary, "DRAFT", payload);
+        apiClient.postJson(futureApiPrefix(feature) + "/" + feature.apiFeatureKey + "/records", body, true, modelCallback(callback, JsonUtils::parseFutureRecord));
+    }
+
+    public void updateFutureRecord(long recordId,
+                                   FutureFeatureDefinition feature,
+                                   String title,
+                                   String summary,
+                                   String status,
+                                   JSONObject payload,
+                                   ApiCallback<FutureFeatureRecord> callback) {
+        JSONObject body = futureRecordBody(feature, title, summary, status, payload);
+        apiClient.putJson(futureApiPrefix(feature) + "/records/" + recordId, body, true, modelCallback(callback, JsonUtils::parseFutureRecord));
+    }
+
+    public void updateFutureRecordStatus(FutureFeatureDefinition feature, long recordId, String status, ApiCallback<FutureFeatureRecord> callback) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("status", status);
+        } catch (Exception ignored) {
+        }
+        apiClient.patchJson(futureApiPrefix(feature) + "/records/" + recordId + "/status", body, true, modelCallback(callback, JsonUtils::parseFutureRecord));
+    }
+
+    public void updateFutureRecordStatus(long recordId, String status, ApiCallback<FutureFeatureRecord> callback) {
+        updateFutureRecordStatus(FutureFeatureRegistry.featureByKey("content.markdown_editor"), recordId, status, callback);
+    }
+
+    public void deleteFutureRecord(FutureFeatureDefinition feature, long recordId, ApiCallback<JSONObject> callback) {
+        apiClient.deleteJson(futureApiPrefix(feature) + "/records/" + recordId, null, true, callback);
+    }
+
+    public void deleteFutureRecord(long recordId, ApiCallback<JSONObject> callback) {
+        apiClient.deleteJson("/api/content/records/" + recordId, null, true, callback);
+    }
+
+    public void createFutureTask(String featureKey, String taskType, String title, JSONObject payload,
+                                 ApiCallback<FutureAsyncTask> callback) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("featureKey", featureKey);
+            body.put("taskType", taskType);
+            body.put("title", title);
+            body.put("payloadJson", payload == null ? new JSONObject().toString() : payload.toString());
+        } catch (Exception ignored) {
+        }
+        apiClient.postJson("/api/tasks", body, true, modelCallback(callback, JsonUtils::parseFutureTask));
+    }
+
+    public void getFutureTasks(String featureKey, String status, ApiCallback<List<FutureAsyncTask>> callback) {
+        Map<String, String> query = new LinkedHashMap<>();
+        query.put("featureKey", featureKey);
+        query.put("status", status);
+        query.put("page", "0");
+        query.put("size", "20");
+        apiClient.get("/api/tasks", query, true, listCallback(callback, JsonUtils::parseFutureTask));
+    }
+
+    public void retryFutureTask(String taskId, ApiCallback<FutureAsyncTask> callback) {
+        apiClient.patchJson("/api/tasks/" + taskId + "/retry", new JSONObject(), true, modelCallback(callback, JsonUtils::parseFutureTask));
+    }
+
+    public void aiGenerate(String featureKey, JSONObject payload, ApiCallback<JSONObject> callback) {
+        apiClient.postJson("/api/ai/generate/" + featureKey, payload == null ? new JSONObject() : payload, true, callback);
+    }
+
+    public void aiChat(JSONObject payload, ApiCallback<JSONObject> callback) {
+        apiClient.postJson("/api/ai/chat", payload == null ? new JSONObject() : payload, true, callback);
+    }
+
+    public void aiRecommendUtility(JSONObject payload, ApiCallback<JSONObject> callback) {
+        apiClient.postJson("/api/ai/recommend/utility", payload == null ? new JSONObject() : payload, true, callback);
+    }
+
+    public void aiSearchAnswer(JSONObject payload, ApiCallback<JSONObject> callback) {
+        apiClient.postJson("/api/ai/search-answer", payload == null ? new JSONObject() : payload, true, callback);
+    }
+
+    public void sanitizeFutureHtml(String html, ApiCallback<JSONObject> callback) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("html", html);
+        } catch (Exception ignored) {
+        }
+        apiClient.postJson("/api/content/tools/sanitize-html", body, true, callback);
+    }
+
+    public void qualityCheckFutureContent(JSONObject payload, ApiCallback<JSONObject> callback) {
+        apiClient.postJson("/api/content/tools/quality-check", payload == null ? new JSONObject() : payload, true, callback);
+    }
+
+    public void getOpenApi(ApiCallback<String> callback) {
+        apiClient.getText("/api/openapi", null, true, callback);
+    }
+
     private <T> ApiCallback<JSONObject> modelCallback(ApiCallback<T> callback, JsonUtils.ItemParser<T> parser) {
         return new ApiCallback<>() {
             @Override
@@ -722,5 +905,100 @@ public class KinRepository {
             }
         }
         return items;
+    }
+
+    private JSONObject futureRecordBody(FutureFeatureDefinition feature, String title, String summary, String status, JSONObject payload) {
+        JSONObject normalizedPayload = payload == null ? new JSONObject() : payload;
+        JSONObject metadata = new JSONObject();
+        try {
+            normalizedPayload.put("summary", summary);
+            normalizedPayload.put("uiFeatureKey", feature.key);
+            normalizedPayload.put("apiFeatureKey", feature.apiFeatureKey);
+            normalizedPayload.put("section", feature.section);
+            metadata.put("source", "android-app");
+            metadata.put("featureGroup", feature.groupKey);
+            metadata.put("uiFeatureKey", feature.key);
+            metadata.put("apiPrefix", futureApiPrefix(feature));
+        } catch (Exception ignored) {
+        }
+
+        JSONObject body = new JSONObject();
+        try {
+            body.put("recordType", recordTypeFor(feature));
+            body.put("status", TextUtils.isEmpty(status) ? "DRAFT" : status);
+            body.put("title", title);
+            body.put("summary", summary);
+            body.put("featureKey", feature.apiFeatureKey);
+            body.put("featureGroup", feature.groupKey);
+            body.put("targetType", normalizedPayload.optString("targetType", "FEATURE"));
+            long targetId = normalizedPayload.optLong("targetId", 0L);
+            if (targetId > 0L) {
+                body.put("targetId", targetId);
+            }
+            body.put("payloadJson", normalizedPayload.toString());
+            body.put("metadataJson", metadata.toString());
+        } catch (Exception ignored) {
+        }
+        return body;
+    }
+
+    private String futureApiPrefix(FutureFeatureDefinition feature) {
+        if (feature == null || TextUtils.isEmpty(feature.apiPrefix)) {
+            return "/api/content";
+        }
+        return feature.apiPrefix;
+    }
+
+    private String futureApiPrefix(String featureGroup) {
+        if (TextUtils.isEmpty(featureGroup)) {
+            return "/api/content";
+        }
+        switch (featureGroup) {
+            case "community":
+                return "/api/community";
+            case "cs2":
+                return "/api/cs2";
+            case "user":
+                return "/api/users/features";
+            case "library":
+                return "/api/library";
+            case "interaction":
+                return "/api/interactions";
+            case "team":
+                return "/api/teams";
+            case "search":
+                return "/api/search-features";
+            case "governance":
+                return "/api/admin/governance";
+            case "notification":
+                return "/api/ops";
+            case "analytics":
+                return "/api/analytics";
+            case "commerce":
+                return "/api/commerce";
+            case "client":
+                return "/api/client-features";
+            case "platform":
+                return "/api/platform";
+            case "content":
+            default:
+                return "/api/content";
+        }
+    }
+
+    private String recordTypeFor(FutureFeatureDefinition feature) {
+        if (feature == null || TextUtils.isEmpty(feature.apiFeatureKey)) {
+            return "CONFIG";
+        }
+        if ("cs2.tactic_board_editor".equals(feature.key)) {
+            return "TACTIC_BOARD";
+        }
+        if (feature.taskEnabled) {
+            return "TASK_CONFIG";
+        }
+        if (feature.groupKey != null) {
+            return feature.groupKey.toUpperCase().replace('-', '_') + "_FEATURE";
+        }
+        return "CONFIG";
     }
 }

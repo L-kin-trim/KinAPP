@@ -24,6 +24,8 @@ import com.example.kin.model.ReviewTemplateModel;
 import com.example.kin.net.ApiCallback;
 import com.example.kin.net.ApiException;
 import com.example.kin.ui.common.KinUi;
+import com.example.kin.ui.future.FutureFeatureDetailActivity;
+import com.example.kin.ui.future.FutureFeatureDomainActivity;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
@@ -90,6 +92,7 @@ public class AdminCenterActivity extends AppCompatActivity {
 
     private void renderShell() {
         contentLayout.addView(sectionTitle("运营总览"));
+        contentLayout.addView(buildGovernanceUpgradeCard());
         contentLayout.addView(buildOverviewCard());
 
         contentLayout.addView(sectionTitle("帖子审核"));
@@ -122,6 +125,30 @@ public class AdminCenterActivity extends AppCompatActivity {
         contentLayout.addView(buildUserSearchCard());
         usersLayout = KinUi.vertical(this);
         contentLayout.addView(usersLayout);
+    }
+
+    private View buildGovernanceUpgradeCard() {
+        MaterialCardView card = KinUi.card(this);
+        LinearLayout body = KinUi.sectionContainer(this, 18);
+        body.addView(KinUi.text(this, "治理升级工作台", 18, true));
+        body.addView(KinUi.muted(this, "审核优先级、多级审核、申诉、处罚、敏感词、证据链、RBAC、审计和运营配置已接入。", 14));
+        MaterialButton governance = KinUi.filledButton(this, "治理模块");
+        governance.setOnClickListener(v -> {
+            android.content.Intent intent = new android.content.Intent(this, FutureFeatureDomainActivity.class);
+            intent.putExtra(FutureFeatureDomainActivity.EXTRA_GROUP_KEY, "governance");
+            startActivity(intent);
+        });
+        MaterialButton ops = KinUi.outlinedButton(this, "运营配置");
+        ops.setOnClickListener(v -> {
+            android.content.Intent intent = new android.content.Intent(this, FutureFeatureDetailActivity.class);
+            intent.putExtra(FutureFeatureDetailActivity.EXTRA_FEATURE_KEY, "governance.ops_config");
+            startActivity(intent);
+        });
+        LinearLayout row = KinUi.buttonRow(this, governance, ops);
+        KinUi.margins(row, this, 0, 12, 0, 0);
+        body.addView(row);
+        card.addView(body);
+        return card;
     }
 
     private View sectionTitle(String label) {

@@ -2,6 +2,7 @@ package com.example.kin;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.Menu;
 import android.view.MenuItem;
 
 import androidx.activity.EdgeToEdge;
@@ -29,6 +30,8 @@ import com.example.kin.ui.PublishFragment;
 import com.example.kin.ui.adapter.MainPagerAdapter;
 import com.example.kin.ui.admin.AdminCenterActivity;
 import com.example.kin.ui.common.RemoteImageLoader;
+import com.example.kin.ui.future.FutureFeatureCenterActivity;
+import com.example.kin.update.GithubReleaseUpdater;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
@@ -43,6 +46,8 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
     private BottomNavigationView bottomNavigationView;
     private List<Fragment> rootFragments;
     private boolean autoLoginInFlight;
+    private boolean autoCheckInInFlight;
+    private GithubReleaseUpdater releaseUpdater;
 
     private final int[] navIds = new int[]{
             R.id.nav_home,
@@ -59,6 +64,7 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
         setContentView(R.layout.activity_main);
         repository = new KinRepository(this);
         imageLoader = new RemoteImageLoader();
+        releaseUpdater = new GithubReleaseUpdater(this);
 
         rootFragments = Arrays.asList(
                 new HomeFragment(),
@@ -79,9 +85,14 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
         topBar.setNavigationIcon(null);
         topBar.setTitle("Kin");
         topBar.inflateMenu(R.menu.menu_main_top);
+        updateFutureMenuVisibility();
         topBar.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == R.id.action_ai_settings) {
                 openAiSettings();
+                return true;
+            }
+            if (item.getItemId() == R.id.action_future_center) {
+                openFutureCenter();
                 return true;
             }
             return false;
@@ -113,8 +124,11 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
     protected void onResume() {
         super.onResume();
         refreshToolbarSubtitle();
+        updateFutureMenuVisibility();
         updateToolbarForPage(viewPager.getCurrentItem());
         ensureSessionAlive();
+        ensureDailyCheckIn();
+        releaseUpdater.checkForUpdates();
     }
 
     public KinRepository getRepository() {
@@ -138,6 +152,19 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
         topBar.setSubtitle(subtitle);
     }
 
+    private void updateFutureMenuVisibility() {
+        if (topBar == null) {
+            return;
+        }
+        Menu menu = topBar.getMenu();
+        MenuItem item = menu.findItem(R.id.action_future_center);
+        if (item == null) {
+            return;
+        }
+        SessionUser user = repository.getSessionManager().getUser();
+        item.setVisible(user != null && user.isAdmin());
+    }
+
     public void openPostDetail(long postId, boolean mine) {
         Intent intent = new Intent(this, PostDetailActivity.class);
         intent.putExtra(PostDetailActivity.EXTRA_POST_ID, postId);
@@ -155,6 +182,10 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
 
     public void openAiSettings() {
         startActivity(new Intent(this, AiSettingsActivity.class));
+    }
+
+    public void openFutureCenter() {
+        startActivity(new Intent(this, FutureFeatureCenterActivity.class));
     }
 
     public void switchToPublish() {
@@ -194,6 +225,7 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
             public void onSuccess(SessionUser data) {
                 autoLoginInFlight = false;
                 refreshToolbarSubtitle();
+                ensureDailyCheckIn();
             }
 
             @Override
@@ -209,5 +241,24 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(intent);
         finish();
+    }
+
+    private void ensureDailyCheckIn() {
+        if (autoCheckInInFlight || !repository.shouldAutoCheckInToday()) {
+            return;
+        }
+        autoCheckInInFlight = true;
+        repository.markAutoCheckInAttemptedToday();
+        repository.checkInToday(new ApiCallback<>() {
+            @Override
+            public void onSuccess(com.example.kin.model.CheckInSummary data) {
+                autoCheckInInFlight = false;
+            }
+
+            @Override
+            public void onError(ApiException exception) {
+                autoCheckInInFlight = false;
+            }
+        });
     }
 }

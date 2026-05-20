@@ -129,8 +129,6 @@ public class MessagesActivity extends AppCompatActivity {
         body.addView(readFilterRow);
         updateReadFilterSelection();
 
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
         MaterialButton composeButton = KinUi.filledButton(this, "发送消息");
         MaterialButton markReadButton = KinUi.outlinedButton(this, "全部已读");
         composeButton.setOnClickListener(v -> showComposeDialog());
@@ -146,9 +144,7 @@ public class MessagesActivity extends AppCompatActivity {
                 setLoading(false, "全部已读失败：" + exception.getMessage());
             }
         }));
-        actions.addView(composeButton);
-        actions.addView(markReadButton);
-        KinUi.margins(markReadButton, this, 10, 0, 0, 0);
+        LinearLayout actions = KinUi.buttonRow(this, composeButton, markReadButton);
         KinUi.margins(actions, this, 0, 14, 0, 0);
         body.addView(actions);
 

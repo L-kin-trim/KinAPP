@@ -6,4 +6,9 @@
         android:icon="@android:drawable/ic_menu_manage"
         android:title="AI &#x8BBE;&#x7F6E;"
         app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_future_center"
+        android:icon="@android:drawable/ic_menu_agenda"
+        android:title="未来功能"
+        app:showAsAction="ifRoom" />
 </menu>

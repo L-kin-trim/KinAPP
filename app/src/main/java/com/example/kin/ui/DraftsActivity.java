@@ -97,19 +97,13 @@ public class DraftsActivity extends AppCompatActivity {
         KinUi.margins(subtitle, this, 0, 8, 0, 0);
         body.addView(subtitle);
 
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
         MaterialButton editButton = KinUi.filledButton(this, "继续编辑");
         editButton.setOnClickListener(v -> startActivity(new Intent(this, PublishEditorActivity.class)));
         MaterialButton detailButton = KinUi.outlinedButton(this, "查看详情");
         detailButton.setOnClickListener(v -> openDraftDetail(draft, local));
         MaterialButton deleteButton = KinUi.outlinedButton(this, local ? "删除本地" : "删除服务端");
         deleteButton.setOnClickListener(v -> deleteDraft(draft, local));
-        actions.addView(editButton);
-        actions.addView(detailButton);
-        actions.addView(deleteButton);
-        KinUi.margins(detailButton, this, 10, 0, 0, 0);
-        KinUi.margins(deleteButton, this, 10, 0, 0, 0);
+        LinearLayout actions = KinUi.buttonRow(this, editButton, detailButton, deleteButton);
         KinUi.margins(actions, this, 0, 14, 0, 0);
         body.addView(actions);
         card.addView(body);

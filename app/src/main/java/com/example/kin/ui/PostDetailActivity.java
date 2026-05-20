@@ -1,10 +1,13 @@
 package com.example.kin.ui;
 
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -25,6 +28,7 @@ import com.example.kin.net.ApiCallback;
 import com.example.kin.net.ApiException;
 import com.example.kin.ui.common.KinUi;
 import com.example.kin.ui.common.RemoteImageLoader;
+import com.example.kin.ui.future.FutureFeatureDetailActivity;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
@@ -54,7 +58,8 @@ public class PostDetailActivity extends AppCompatActivity {
     private TextView commentImageState;
     private TextView replyHintView;
     private TextInputEditText commentEdit;
-    private MaterialButton likeButton;
+    private ImageView likeActionIcon;
+    private TextView likeActionLabel;
     private long replyTargetCommentId;
     private final List<Uri> commentImageUris = new ArrayList<>();
 
@@ -122,7 +127,7 @@ public class PostDetailActivity extends AppCompatActivity {
             @Override
             public void onSuccess(List<ForumCommentModel> data) {
                 renderComments(data);
-                setLoading(false, data.isEmpty() ? "还没有评论。" : "");
+                setLoading(false, "");
             }
 
             @Override
@@ -137,22 +142,13 @@ public class PostDetailActivity extends AppCompatActivity {
         contentLayout.addView(progressBar);
         contentLayout.addView(statusView);
 
-        MaterialCardView card = KinUi.card(this);
         LinearLayout body = KinUi.sectionContainer(this, 18);
         body.addView(KinUi.text(this, currentPost.title, 22, true));
         TextView meta = KinUi.muted(this,
-                currentPost.createdByUsername + " · " + currentPost.createdAt + " · " + currentPost.reviewStatus,
+                currentPost.createdByUsername + " · " + currentPost.createdAt,
                 13);
         KinUi.margins(meta, this, 0, 8, 0, 0);
         body.addView(meta);
-
-        TextView statusText = KinUi.muted(this,
-                "版本 " + currentPost.version
-                        + (TextUtils.isEmpty(currentPost.reviewRemark) ? "" : " · 审核备注：" + currentPost.reviewRemark)
-                        + (TextUtils.isEmpty(currentPost.editableUntil) ? "" : " · 可编辑至 " + currentPost.editableUntil),
-                13);
-        KinUi.margins(statusText, this, 0, 8, 0, 0);
-        body.addView(statusText);
 
         TextView summary = KinUi.muted(this, buildSummary(), 15);
         KinUi.margins(summary, this, 0, 12, 0, 0);
@@ -160,38 +156,12 @@ public class PostDetailActivity extends AppCompatActivity {
 
         List<String> images = previewImages();
         if (!images.isEmpty()) {
-            View strip = KinUi.imageStrip(this, images, imageLoader);
+            View strip = buildPreviewImageStrip(images);
             KinUi.margins(strip, this, 0, 14, 0, 0);
             body.addView(strip);
         }
 
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        likeButton = KinUi.filledButton(this, (currentPost.liked ? "已赞 " : "点赞 ") + currentPost.likeCount);
-        likeButton.setOnClickListener(v -> toggleLike());
-        MaterialButton favoriteButton = KinUi.outlinedButton(this, "收藏");
-        favoriteButton.setOnClickListener(v -> repository.favoritePost(postId, new ApiCallback<>() {
-            @Override
-            public void onSuccess(com.example.kin.model.FavoriteStatus data) {
-                favoriteButton.setText(data.favorited ? "已收藏" : "收藏");
-            }
-
-            @Override
-            public void onError(ApiException exception) {
-                setLoading(false, "收藏失败：" + exception.getMessage());
-            }
-        }));
-        MaterialButton messageButton = KinUi.outlinedButton(this, "发消息");
-        messageButton.setOnClickListener(v -> showMessageDialog());
-        MaterialButton reportButton = KinUi.outlinedButton(this, "举报");
-        reportButton.setOnClickListener(v -> showReportDialog("POST", currentPost.id));
-        actions.addView(likeButton);
-        actions.addView(favoriteButton);
-        actions.addView(messageButton);
-        actions.addView(reportButton);
-        KinUi.margins(favoriteButton, this, 10, 0, 0, 0);
-        KinUi.margins(messageButton, this, 10, 0, 0, 0);
-        KinUi.margins(reportButton, this, 10, 0, 0, 0);
+        View actions = buildPostActionIcons();
         KinUi.margins(actions, this, 0, 16, 0, 0);
         body.addView(actions);
 
@@ -220,16 +190,151 @@ public class PostDetailActivity extends AppCompatActivity {
             body.addView(withdrawButton);
         }
 
-        card.addView(body);
-        contentLayout.addView(card);
+        contentLayout.addView(body);
+
+        View divider = KinUi.divider(this);
+        KinUi.margins(divider, this, 0, 18, 0, 18);
+        contentLayout.addView(divider);
+
         contentLayout.addView(buildCommentComposer());
 
         commentsLayout = KinUi.vertical(this);
+        KinUi.margins(commentsLayout, this, 0, 18, 0, 0);
         contentLayout.addView(commentsLayout);
     }
 
-    private View buildCommentComposer() {
+    private View buildPostActionIcons() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER);
+
+        likeActionIcon = new ImageView(this);
+        likeActionLabel = KinUi.muted(this, "", 12);
+        View likeAction = buildIconAction(likeActionIcon, likeActionLabel, R.drawable.ic_action_like, "点赞");
+        likeAction.setOnClickListener(v -> toggleLike());
+        applyLikeActionState();
+
+        ImageView favoriteIcon = new ImageView(this);
+        TextView favoriteLabel = KinUi.muted(this, "收藏", 12);
+        View favoriteAction = buildIconAction(favoriteIcon, favoriteLabel, R.drawable.ic_action_favorite, "收藏");
+        favoriteAction.setOnClickListener(v -> repository.favoritePost(postId, new ApiCallback<>() {
+            @Override
+            public void onSuccess(com.example.kin.model.FavoriteStatus data) {
+                favoriteLabel.setText(data.favorited ? "已收藏" : "收藏");
+                favoriteIcon.setColorFilter(getColor(data.favorited ? R.color.kin_warning : R.color.kin_text_muted));
+            }
+
+            @Override
+            public void onError(ApiException exception) {
+                setLoading(false, "收藏失败：" + exception.getMessage());
+            }
+        }));
+
+        ImageView reportIcon = new ImageView(this);
+        TextView reportLabel = KinUi.muted(this, "举报", 12);
+        View reportAction = buildIconAction(reportIcon, reportLabel, R.drawable.ic_action_report, "举报");
+        reportAction.setOnClickListener(v -> showReportDialog("POST", currentPost.id));
+
+        row.addView(likeAction, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        row.addView(favoriteAction, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        row.addView(reportAction, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        return row;
+    }
+
+    private View buildIconAction(ImageView icon, TextView label, int iconResId, String contentDescription) {
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setGravity(android.view.Gravity.CENTER);
+        container.setClickable(true);
+        container.setFocusable(true);
+        container.setContentDescription(contentDescription);
+        container.setPadding(KinUi.dp(this, 8), KinUi.dp(this, 6), KinUi.dp(this, 8), KinUi.dp(this, 6));
+
+        icon.setImageResource(iconResId);
+        icon.setColorFilter(getColor(R.color.kin_text_muted));
+        container.addView(icon, new LinearLayout.LayoutParams(KinUi.dp(this, 28), KinUi.dp(this, 28)));
+        KinUi.margins(label, this, 0, 4, 0, 0);
+        label.setGravity(android.view.Gravity.CENTER);
+        container.addView(label);
+        return container;
+    }
+
+    private void applyLikeActionState() {
+        if (likeActionIcon == null || likeActionLabel == null || currentPost == null) {
+            return;
+        }
+        likeActionLabel.setText((currentPost.liked ? "已赞 " : "点赞 ") + currentPost.likeCount);
+        likeActionIcon.setColorFilter(getColor(currentPost.liked ? R.color.kin_danger : R.color.kin_text_muted));
+    }
+
+    private View buildPreviewImageStrip(List<String> urls) {
+        HorizontalScrollView scrollView = new HorizontalScrollView(this);
+        scrollView.setHorizontalScrollBarEnabled(false);
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, KinUi.dp(this, 8), 0, KinUi.dp(this, 8));
+        scrollView.addView(row);
+        for (int i = 0; i < urls.size(); i++) {
+            String url = urls.get(i);
+            if (TextUtils.isEmpty(url)) {
+                continue;
+            }
+            ImageView imageView = new ImageView(this);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(KinUi.dp(this, 160), KinUi.dp(this, 112));
+            params.rightMargin = KinUi.dp(this, 10);
+            imageView.setLayoutParams(params);
+            imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            imageView.setBackgroundColor(getColor(KinUi.isNight(this) ? R.color.kin_dark_panel_alt : R.color.kin_light_panel_alt));
+            imageView.setClipToOutline(true);
+            imageView.setClickable(true);
+            imageView.setFocusable(true);
+            int index = i;
+            imageView.setOnClickListener(v -> openImagePreview(urls, index));
+            imageLoader.load(imageView, url);
+            row.addView(imageView);
+        }
+        return scrollView;
+    }
+
+    private void openImagePreview(List<String> urls, int index) {
+        Intent intent = new Intent(this, ImagePreviewActivity.class);
+        intent.putStringArrayListExtra(ImagePreviewActivity.EXTRA_IMAGE_URLS, new ArrayList<>(urls));
+        intent.putExtra(ImagePreviewActivity.EXTRA_IMAGE_INDEX, index);
+        startActivity(intent);
+    }
+
+    private View buildPostUpgradeCard() {
         MaterialCardView card = KinUi.card(this);
+        LinearLayout body = KinUi.sectionContainer(this, 18);
+        body.addView(KinUi.text(this, "帖子详情工具", 18, true));
+        body.addView(KinUi.muted(this, "版本历史、阅读进度、相似推荐、投票、分享海报和评论总结集中在详情页使用。", 14));
+        LinearLayout row = KinUi.buttonRow(this,
+                featureButton("版本历史", "content.version_history"),
+                featureButton("相似推荐", "community.similar_content"),
+                featureButton("评论总结", "ai.comment_summary"));
+        KinUi.margins(row, this, 0, 12, 0, 0);
+        body.addView(row);
+        LinearLayout row2 = KinUi.buttonRow(this,
+                featureButton("阅读进度", "community.reading_progress"),
+                featureButton("投票", "community.poll_post"),
+                featureButton("分享海报", "community.share_poster"));
+        KinUi.margins(row2, this, 0, 10, 0, 0);
+        body.addView(row2);
+        card.addView(body);
+        return card;
+    }
+
+    private MaterialButton featureButton(String label, String featureKey) {
+        MaterialButton button = KinUi.outlinedButton(this, label);
+        button.setOnClickListener(v -> {
+            android.content.Intent intent = new android.content.Intent(this, FutureFeatureDetailActivity.class);
+            intent.putExtra(FutureFeatureDetailActivity.EXTRA_FEATURE_KEY, featureKey);
+            startActivity(intent);
+        });
+        return button;
+    }
+
+    private View buildCommentComposer() {
         LinearLayout body = KinUi.sectionContainer(this, 18);
         body.addView(KinUi.text(this, "发表评论", 18, true));
         replyHintView = KinUi.muted(this, "", 13);
@@ -246,9 +351,8 @@ public class PostDetailActivity extends AppCompatActivity {
         commentImageState = KinUi.muted(this, "评论图片：0 张", 13);
         MaterialButton pickButton = KinUi.outlinedButton(this, "选择图片");
         pickButton.setOnClickListener(v -> commentImagePicker.launch("image/*"));
-        imageRow.addView(commentImageState);
-        imageRow.addView(pickButton);
-        KinUi.margins(pickButton, this, 10, 0, 0, 0);
+        imageRow.addView(commentImageState, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        imageRow.addView(pickButton, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         KinUi.margins(imageRow, this, 0, 12, 0, 0);
         body.addView(imageRow);
 
@@ -257,14 +361,16 @@ public class PostDetailActivity extends AppCompatActivity {
         KinUi.margins(sendButton, this, 0, 14, 0, 0);
         body.addView(sendButton);
 
-        card.addView(body);
-        return card;
+        return body;
     }
 
     private void renderComments(List<ForumCommentModel> comments) {
         commentsLayout.removeAllViews();
+        if (comments.isEmpty()) {
+            commentsLayout.addView(KinUi.muted(this, "还没有评论。", 14));
+            return;
+        }
         for (ForumCommentModel comment : comments) {
-            MaterialCardView card = KinUi.card(this);
             LinearLayout body = KinUi.sectionContainer(this, 16);
             body.addView(KinUi.text(this, "#" + comment.floorNumber + " " + comment.username, 16, true));
             TextView meta = KinUi.muted(this,
@@ -281,8 +387,6 @@ public class PostDetailActivity extends AppCompatActivity {
                 body.addView(strip);
             }
 
-            LinearLayout actions = new LinearLayout(this);
-            actions.setOrientation(LinearLayout.HORIZONTAL);
             MaterialButton replyButton = KinUi.outlinedButton(this, "回复");
             replyButton.setOnClickListener(v -> {
                 replyTargetCommentId = comment.id;
@@ -292,13 +396,13 @@ public class PostDetailActivity extends AppCompatActivity {
             });
             MaterialButton reportButton = KinUi.outlinedButton(this, "举报");
             reportButton.setOnClickListener(v -> showReportDialog("COMMENT", comment.id));
-            actions.addView(replyButton);
-            actions.addView(reportButton);
-            KinUi.margins(reportButton, this, 10, 0, 0, 0);
+            LinearLayout actions = KinUi.buttonRow(this, replyButton, reportButton);
             KinUi.margins(actions, this, 0, 12, 0, 0);
             body.addView(actions);
-            card.addView(body);
-            commentsLayout.addView(card);
+            commentsLayout.addView(body);
+            View divider = KinUi.divider(this);
+            KinUi.margins(divider, this, 0, 4, 0, 4);
+            commentsLayout.addView(divider);
         }
     }
 
@@ -356,7 +460,7 @@ public class PostDetailActivity extends AppCompatActivity {
             public void onSuccess(LikeStatusModel data) {
                 currentPost.liked = data.liked;
                 currentPost.likeCount = data.likeCount;
-                likeButton.setText((data.liked ? "已赞 " : "点赞 ") + data.likeCount);
+                applyLikeActionState();
             }
 
             @Override
@@ -553,12 +657,39 @@ public class PostDetailActivity extends AppCompatActivity {
 
     private String buildSummary() {
         if ("PROP_SHARE".equals(currentPost.postType)) {
-            return currentPost.mapName + " · " + currentPost.toolType + " · " + currentPost.propPosition + "\n" + currentPost.throwMethod;
+            return currentPost.mapName + " · " + translateToolType(currentPost.toolType) + " · " + currentPost.propPosition + "\n" + currentPost.throwMethod;
         }
         if ("TACTIC_SHARE".equals(currentPost.postType)) {
             return currentPost.mapName + " · " + currentPost.tacticType + "\n" + currentPost.tacticDescription;
         }
         return currentPost.content;
+    }
+
+    private String translateToolType(String toolType) {
+        if (TextUtils.isEmpty(toolType)) {
+            return "";
+        }
+        switch (toolType) {
+            case "SMOKE":
+            case "SMOKE_GRENADE":
+                return "烟雾弹";
+            case "FLASH":
+            case "FLASHBANG":
+                return "闪光弹";
+            case "HE":
+            case "HE_GRENADE":
+                return "高爆手雷";
+            case "MOLOTOV":
+                return "燃烧瓶";
+            case "INCENDIARY":
+            case "INCENDIARY_GRENADE":
+                return "燃烧弹";
+            case "DECOY":
+            case "DECOY_GRENADE":
+                return "诱饵弹";
+            default:
+                return toolType;
+        }
     }
 
     private void setLoading(boolean loading, String message) {

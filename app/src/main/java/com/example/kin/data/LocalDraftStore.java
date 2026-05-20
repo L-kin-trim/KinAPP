@@ -7,6 +7,7 @@ import com.example.kin.data.local.KinDatabase;
 import com.example.kin.data.local.LocalDraftDao;
 import com.example.kin.data.local.LocalDraftEntity;
 import com.example.kin.model.DraftModel;
+import com.example.kin.util.DisplayTimeFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -65,7 +66,7 @@ public class LocalDraftStore {
         model.title = entity.title;
         model.payloadJson = entity.payloadJson;
         model.autoSaved = true;
-        model.updatedAt = String.valueOf(entity.updatedAt);
+        model.updatedAt = DisplayTimeFormatter.formatDisplayTime(entity.updatedAt);
         return model;
     }
 }

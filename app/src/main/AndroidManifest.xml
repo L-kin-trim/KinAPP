@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:allowBackup="true"
@@ -14,13 +15,19 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Kin"
         android:usesCleartextTraffic="true">
+        <activity android:name=".ui.future.FutureTaskCenterActivity" />
+        <activity android:name=".ui.future.FutureFeatureDetailActivity" />
+        <activity android:name=".ui.future.FutureFeatureDomainActivity" />
+        <activity android:name=".ui.future.FutureFeatureCenterActivity" />
         <activity android:name=".ui.AiSettingsActivity" />
         <activity android:name=".ui.admin.AdminCenterActivity" />
         <activity android:name=".ui.MessagesActivity" />
+        <activity android:name=".ui.ImagePreviewActivity" />
         <activity android:name=".ui.PostDetailActivity" />
         <activity android:name=".ui.PublishEditorActivity" />
         <activity android:name=".ui.DraftsActivity" />
         <activity android:name=".ui.MessageBoardActivity" />
+        <activity android:name=".ui.CheckInActivity" />
         <activity android:name=".ui.MyReportsActivity" />
         <activity android:name=".ui.UserProfileActivity" />
         <activity android:name=".ui.AuthActivity" />

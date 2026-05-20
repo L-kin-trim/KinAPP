@@ -23,6 +23,7 @@ import com.example.kin.net.ApiException;
 import com.example.kin.net.OpenAiStreamClient;
 import com.example.kin.ui.common.BasePageFragment;
 import com.example.kin.ui.common.KinUi;
+import com.example.kin.ui.future.FutureFeatureDetailActivity;
 import com.example.kin.util.ScoreboardOcrOrchestrator;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
@@ -98,12 +99,49 @@ public class AiRecommendFragment extends BasePageFragment {
 
         configHintCard = buildConfigHintCard(activity);
         contentLayout.addView(configHintCard);
+        contentLayout.addView(buildAiSuiteCard(activity));
         contentLayout.addView(buildImageCard(activity));
         contentLayout.addView(buildOcrCard(activity));
         contentLayout.addView(buildOutputCard(activity));
 
         refreshConfigHint();
         setLoading(false, "");
+    }
+
+    private View buildAiSuiteCard(MainActivity activity) {
+        MaterialCardView card = KinUi.card(activity);
+        LinearLayout body = KinUi.sectionContainer(activity, 20);
+        body.addView(KinUi.text(activity, "AI 战术与内容助手", 20, true));
+        TextView subtitle = KinUi.muted(activity, "聊天、道具推荐、战术生成、标题摘要、复盘、个人教练和搜索问答按 AI 页集中使用。", 14);
+        KinUi.margins(subtitle, activity, 0, 8, 0, 0);
+        body.addView(subtitle);
+        MaterialButton chat = KinUi.outlinedButton(activity, "AI 聊天");
+        chat.setOnClickListener(v -> openFuture("ai.chat_assistant"));
+        MaterialButton tactic = KinUi.outlinedButton(activity, "战术生成");
+        tactic.setOnClickListener(v -> openFuture("ai.tactic_generator"));
+        MaterialButton utility = KinUi.outlinedButton(activity, "道具推荐");
+        utility.setOnClickListener(v -> openFuture("ai.utility_recommendation"));
+        LinearLayout row = KinUi.buttonRow(activity, chat, tactic, utility);
+        KinUi.margins(row, activity, 0, 14, 0, 0);
+        body.addView(row);
+        MaterialButton coach = KinUi.outlinedButton(activity, "个人教练");
+        coach.setOnClickListener(v -> openFuture("ai.personal_coach"));
+        MaterialButton review = KinUi.outlinedButton(activity, "复盘分析");
+        review.setOnClickListener(v -> openFuture("ai.demo_review"));
+        MaterialButton qa = KinUi.outlinedButton(activity, "搜索问答");
+        qa.setOnClickListener(v -> openFuture("ai.search_qa"));
+        LinearLayout row2 = KinUi.buttonRow(activity, coach, review, qa);
+        KinUi.margins(row2, activity, 0, 10, 0, 0);
+        body.addView(row2);
+        card.addView(body);
+        return card;
+    }
+
+    private void openFuture(String featureKey) {
+        MainActivity activity = (MainActivity) requireActivity();
+        android.content.Intent intent = new android.content.Intent(activity, FutureFeatureDetailActivity.class);
+        intent.putExtra(FutureFeatureDetailActivity.EXTRA_FEATURE_KEY, featureKey);
+        startActivity(intent);
     }
 
     @Override
@@ -138,15 +176,11 @@ public class AiRecommendFragment extends BasePageFragment {
         KinUi.margins(subtitle, activity, 0, 8, 0, 0);
         body.addView(subtitle);
 
-        LinearLayout actions = new LinearLayout(activity);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
         MaterialButton pickButton = KinUi.filledButton(activity, "\u76f8\u518c\u9009\u56fe");
         pickButton.setOnClickListener(v -> galleryPicker.launch("image/*"));
         MaterialButton cameraButton = KinUi.outlinedButton(activity, "\u62cd\u7167");
         cameraButton.setOnClickListener(v -> launchCamera());
-        actions.addView(pickButton);
-        actions.addView(cameraButton);
-        KinUi.margins(cameraButton, activity, 10, 0, 0, 0);
+        LinearLayout actions = KinUi.buttonRow(activity, pickButton, cameraButton);
         KinUi.margins(actions, activity, 0, 14, 0, 0);
         body.addView(actions);
 
@@ -218,19 +252,13 @@ public class AiRecommendFragment extends BasePageFragment {
         KinUi.margins(streamStatus, activity, 0, 8, 0, 0);
         body.addView(streamStatus);
 
-        LinearLayout actions = new LinearLayout(activity);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
         startButton = KinUi.filledButton(activity, "\u5f00\u59cb\u5206\u6790");
         stopButton = KinUi.outlinedButton(activity, "\u505c\u6b62");
         retryButton = KinUi.outlinedButton(activity, "\u91cd\u8bd5");
         startButton.setOnClickListener(v -> startStreaming(false));
         retryButton.setOnClickListener(v -> startStreaming(true));
         stopButton.setOnClickListener(v -> stopStreaming("\u5df2\u505c\u6b62"));
-        actions.addView(startButton);
-        actions.addView(stopButton);
-        actions.addView(retryButton);
-        KinUi.margins(stopButton, activity, 10, 0, 0, 0);
-        KinUi.margins(retryButton, activity, 10, 0, 0, 0);
+        LinearLayout actions = KinUi.buttonRow(activity, startButton, stopButton, retryButton);
         KinUi.margins(actions, activity, 0, 12, 0, 0);
         body.addView(actions);
         stopButton.setEnabled(false);

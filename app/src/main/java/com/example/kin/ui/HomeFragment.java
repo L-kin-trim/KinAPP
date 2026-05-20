@@ -1,14 +1,17 @@
 package com.example.kin.ui;
 
+import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AlertDialog;
 
 import com.example.kin.MainActivity;
+import com.example.kin.R;
 import com.example.kin.model.ForumPostModel;
 import com.example.kin.model.HotKeywordModel;
 import com.example.kin.model.LikeStatusModel;
@@ -47,10 +50,6 @@ public class HomeFragment extends BasePageFragment {
         MainActivity activity = (MainActivity) requireActivity();
         activity.setTopBar("首页", "");
 
-        contentLayout.addView(buildHeroCard(activity));
-        contentLayout.addView(buildFilterRow(activity));
-        contentLayout.addView(buildHotKeywordsCard(activity));
-
         listContainer = KinUi.vertical(activity);
         contentLayout.addView(listContainer, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -60,8 +59,35 @@ public class HomeFragment extends BasePageFragment {
         loadMoreButton = KinUi.outlinedButton(activity, "加载更多");
         loadMoreButton.setOnClickListener(v -> loadPosts(false));
         contentLayout.addView(loadMoreButton);
-        loadHotKeywords();
         loadPosts(true);
+    }
+
+    private View buildFutureCard(MainActivity activity) {
+        MaterialCardView card = KinUi.card(activity);
+        LinearLayout body = KinUi.sectionContainer(activity, 18);
+        body.addView(KinUi.text(activity, "社区浏览能力", 19, true));
+        TextView subtitle = KinUi.muted(activity, "推荐流、关注动态、热榜、话题、新手专区、问答与相似内容按首页场景提供。", 14);
+        KinUi.margins(subtitle, activity, 0, 8, 0, 0);
+        body.addView(subtitle);
+        LinearLayout row;
+        MaterialButton recommendButton = KinUi.filledButton(activity, "个性推荐");
+        recommendButton.setOnClickListener(v -> openFutureFeature("community.recommend_feed"));
+        MaterialButton hotButton = KinUi.outlinedButton(activity, "热榜趋势");
+        hotButton.setOnClickListener(v -> openFutureFeature("community.trending_rank"));
+        MaterialButton beginnerButton = KinUi.outlinedButton(activity, "新手专区");
+        beginnerButton.setOnClickListener(v -> openFutureFeature("community.beginner_zone"));
+        row = KinUi.buttonRow(activity, recommendButton, hotButton, beginnerButton);
+        KinUi.margins(row, activity, 0, 14, 0, 0);
+        body.addView(row);
+        card.addView(body);
+        return card;
+    }
+
+    private void openFutureFeature(String featureKey) {
+        MainActivity activity = (MainActivity) requireActivity();
+        android.content.Intent intent = new android.content.Intent(activity, com.example.kin.ui.future.FutureFeatureDetailActivity.class);
+        intent.putExtra(com.example.kin.ui.future.FutureFeatureDetailActivity.EXTRA_FEATURE_KEY, featureKey);
+        startActivity(intent);
     }
 
     private View buildHeroCard(MainActivity activity) {
@@ -74,11 +100,7 @@ public class HomeFragment extends BasePageFragment {
         MaterialButton publishButton = KinUi.outlinedButton(activity, "去发布");
         publishButton.setOnClickListener(v -> activity.switchToPublish());
 
-        LinearLayout actions = new LinearLayout(activity);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.addView(searchButton);
-        actions.addView(publishButton);
-        KinUi.margins(publishButton, activity, 10, 0, 0, 0);
+        LinearLayout actions = KinUi.buttonRow(activity, searchButton, publishButton);
 
         body.addView(title);
         KinUi.margins(subtitle, activity, 0, 8, 0, 14);
@@ -241,6 +263,11 @@ public class HomeFragment extends BasePageFragment {
     private void renderPosts(RemoteImageLoader imageLoader) {
         listContainer.removeAllViews();
         MainActivity activity = (MainActivity) requireActivity();
+        if (System.currentTimeMillis() >= 0) {
+            renderFeedPosts(activity, imageLoader);
+            loadMoreButton.setVisibility(lastPage ? View.GONE : View.VISIBLE);
+            return;
+        }
         for (ForumPostModel post : posts) {
             MaterialCardView card = KinUi.card(activity);
             LinearLayout body = KinUi.sectionContainer(activity, 16);
@@ -264,17 +291,15 @@ public class HomeFragment extends BasePageFragment {
 
             List<String> previewImages = previewImages(post);
             if (!previewImages.isEmpty()) {
-                View images = KinUi.imageStrip(activity, previewImages, imageLoader);
+                View images = buildImagePreviewRow(activity, previewImages, imageLoader);
                 KinUi.margins(images, activity, 0, 12, 0, 0);
                 body.addView(images);
             }
 
-            LinearLayout actions = new LinearLayout(activity);
-            actions.setOrientation(LinearLayout.HORIZONTAL);
-            actions.setWeightSum(4f);
             MaterialButton detailButton = KinUi.filledButton(activity, "\u8be6\u60c5");
             detailButton.setOnClickListener(v -> activity.openPostDetail(post.id,
-                    TextUtils.equals(post.createdByUsername, activity.getRepository().getSessionManager().getUser().username)));
+                    activity.getRepository().getSessionManager().getUser() != null
+                            && TextUtils.equals(post.createdByUsername, activity.getRepository().getSessionManager().getUser().username)));
             MaterialButton likeButton = KinUi.outlinedButton(activity, "\u70b9\u8d5e " + post.likeCount);
             likeButton.setOnClickListener(v -> toggleLike(post, likeButton));
             MaterialButton favoriteButton = KinUi.outlinedButton(activity, "\u6536\u85cf");
@@ -292,21 +317,141 @@ public class HomeFragment extends BasePageFragment {
             MaterialButton reportButton = KinUi.outlinedButton(activity, "\u4e3e\u62a5");
             reportButton.setOnClickListener(v -> showReportDialog(post.id));
 
-            applyPostActionButtonStyle(activity, detailButton, 0);
-            applyPostActionButtonStyle(activity, likeButton, 10);
-            applyPostActionButtonStyle(activity, favoriteButton, 10);
-            applyPostActionButtonStyle(activity, reportButton, 10);
-
-            actions.addView(detailButton);
-            actions.addView(likeButton);
-            actions.addView(favoriteButton);
-            actions.addView(reportButton);
+            LinearLayout actions = KinUi.buttonGrid(activity, 2, detailButton, likeButton, favoriteButton, reportButton);
             KinUi.margins(actions, activity, 0, 14, 0, 0);
             body.addView(actions);
             card.addView(body);
             listContainer.addView(card);
         }
         loadMoreButton.setVisibility(lastPage ? View.GONE : View.VISIBLE);
+    }
+
+    private void renderFeedPosts(MainActivity activity, RemoteImageLoader imageLoader) {
+        for (ForumPostModel post : posts) {
+            MaterialCardView card = KinUi.card(activity);
+            card.setClickable(true);
+            card.setFocusable(true);
+            card.setOnClickListener(v -> openPostDetail(activity, post));
+
+            LinearLayout body = KinUi.sectionContainer(activity, 16);
+            TextView title = KinUi.text(activity, safeText(post.title, "\u672a\u547d\u540d\u5e16\u5b50"), 20, true);
+            title.setMaxLines(2);
+            title.setEllipsize(TextUtils.TruncateAt.END);
+            body.addView(title);
+
+            TextView meta = KinUi.muted(activity, buildFeedMeta(post), 13);
+            meta.setMaxLines(1);
+            meta.setEllipsize(TextUtils.TruncateAt.END);
+            KinUi.margins(meta, activity, 0, 8, 0, 0);
+            body.addView(meta);
+
+            TextView summary = KinUi.text(activity, buildFeedSummary(post), 15, false);
+            summary.setMaxLines(2);
+            summary.setEllipsize(TextUtils.TruncateAt.END);
+            summary.setLineSpacing(KinUi.dp(activity, 2), 1f);
+            KinUi.margins(summary, activity, 0, 8, 0, 0);
+            body.addView(summary);
+
+            List<String> previewImages = previewImages(post);
+            if (!previewImages.isEmpty()) {
+                View images = buildImagePreviewRow(activity, previewImages, imageLoader);
+                KinUi.margins(images, activity, 0, 12, 0, 0);
+                body.addView(images);
+            }
+
+            body.addView(buildPostFooter(activity, post));
+            card.addView(body);
+            listContainer.addView(card);
+        }
+    }
+
+    private void openPostDetail(MainActivity activity, ForumPostModel post) {
+        activity.openPostDetail(post.id,
+                activity.getRepository().getSessionManager().getUser() != null
+                        && TextUtils.equals(post.createdByUsername, activity.getRepository().getSessionManager().getUser().username));
+    }
+
+    private View buildAuthorRow(MainActivity activity, ForumPostModel post) {
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+        TextView username = KinUi.muted(activity, safeText(post.createdByUsername, "\u7528\u6237"), 13);
+        username.setMaxLines(1);
+        username.setEllipsize(TextUtils.TruncateAt.END);
+        row.addView(username, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView level = buildLevelBadge(activity, post.authorLevel);
+        row.addView(level);
+        return row;
+    }
+
+    private TextView buildLevelBadge(MainActivity activity, int authorLevel) {
+        TextView badge = KinUi.text(activity, "Lv." + Math.max(authorLevel, 0), 11, true);
+        badge.setTextColor(activity.getColor(R.color.kin_text_inverse));
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(activity.getColor(R.color.kin_danger));
+        background.setCornerRadius(KinUi.dp(activity, 5));
+        badge.setBackground(background);
+        badge.setPadding(KinUi.dp(activity, 5), KinUi.dp(activity, 2), KinUi.dp(activity, 5), KinUi.dp(activity, 2));
+        return badge;
+    }
+
+    private View buildPostFooter(MainActivity activity, ForumPostModel post) {
+        LinearLayout footer = new LinearLayout(activity);
+        footer.setOrientation(LinearLayout.HORIZONTAL);
+        footer.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        KinUi.margins(footer, activity, 0, 12, 0, 0);
+
+        TextView author = KinUi.muted(activity, safeText(post.createdByUsername, "\u7528\u6237"), 13);
+        author.setMaxLines(1);
+        author.setEllipsize(TextUtils.TruncateAt.END);
+        footer.addView(author, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView stats = KinUi.muted(activity,
+                "\u70b9\u8d5e " + post.likeCount + "    \u8bc4\u8bba " + post.commentCount,
+                13);
+        stats.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_END);
+        footer.addView(stats);
+        return footer;
+    }
+
+    private TextView buildCategoryBadge(MainActivity activity, String label) {
+        TextView badge = KinUi.text(activity, label, 13, false);
+        badge.setTextColor(activity.getColor(R.color.kin_text_muted));
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(activity.getColor(R.color.kin_light_panel_alt));
+        background.setCornerRadius(KinUi.dp(activity, 5));
+        badge.setBackground(background);
+        badge.setPadding(KinUi.dp(activity, 8), KinUi.dp(activity, 4), KinUi.dp(activity, 8), KinUi.dp(activity, 4));
+        return badge;
+    }
+
+    private View buildImagePreviewRow(MainActivity activity, List<String> urls, RemoteImageLoader imageLoader) {
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        int visibleCount = Math.min(urls.size(), 3);
+        for (int i = 0; i < visibleCount; i++) {
+            ImageView imageView = new ImageView(activity);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    0,
+                    KinUi.dp(activity, 118),
+                    1f
+            );
+            if (i > 0) {
+                params.leftMargin = KinUi.dp(activity, 8);
+            }
+            imageView.setLayoutParams(params);
+            imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            GradientDrawable background = new GradientDrawable();
+            background.setColor(activity.getColor(R.color.kin_light_panel_alt));
+            background.setCornerRadius(KinUi.dp(activity, 8));
+            imageView.setBackground(background);
+            imageView.setClipToOutline(true);
+            imageLoader.load(imageView, urls.get(i));
+            row.addView(imageView);
+        }
+        return row;
     }
 
     private void toggleLike(ForumPostModel post, MaterialButton likeButton) {
@@ -364,16 +509,20 @@ public class HomeFragment extends BasePageFragment {
     private List<String> previewImages(ForumPostModel post) {
         List<String> items = new ArrayList<>();
         if (!post.imageUrls.isEmpty()) {
-            items.addAll(post.imageUrls);
+            for (String imageUrl : post.imageUrls) {
+                if (!TextUtils.isEmpty(imageUrl) && items.size() < 3) {
+                    items.add(imageUrl);
+                }
+            }
             return items;
         }
-        if (!TextUtils.isEmpty(post.stanceImageUrl)) {
+        if (!TextUtils.isEmpty(post.stanceImageUrl) && items.size() < 3) {
             items.add(post.stanceImageUrl);
         }
-        if (!TextUtils.isEmpty(post.aimImageUrl)) {
+        if (!TextUtils.isEmpty(post.aimImageUrl) && items.size() < 3) {
             items.add(post.aimImageUrl);
         }
-        if (!TextUtils.isEmpty(post.landingImageUrl)) {
+        if (!TextUtils.isEmpty(post.landingImageUrl) && items.size() < 3) {
             items.add(post.landingImageUrl);
         }
         return items;
@@ -381,12 +530,37 @@ public class HomeFragment extends BasePageFragment {
 
     private String buildSummary(ForumPostModel post) {
         if ("PROP_SHARE".equals(post.postType)) {
-            return post.mapName + " · " + post.toolType + " · " + post.throwMethod;
+            return post.mapName + " · " + translateToolType(post.toolType) + " · " + post.throwMethod;
         }
         if ("TACTIC_SHARE".equals(post.postType)) {
             return post.mapName + " · " + post.tacticType + " · " + JsonUtils.shorten(post.tacticDescription);
         }
         return JsonUtils.shorten(post.content);
+    }
+
+    private String buildFeedMeta(ForumPostModel post) {
+        return safeText(post.createdAt, "") + " · " + translateType(post.postType);
+    }
+
+    private String buildFeedSummary(ForumPostModel post) {
+        if ("PROP_SHARE".equals(post.postType)) {
+            return safeText(post.throwMethod, post.propPosition);
+        }
+        if ("TACTIC_SHARE".equals(post.postType)) {
+            return safeText(post.tacticDescription, post.tacticType);
+        }
+        return safeText(post.content, "\u6682\u65e0\u6b63\u6587");
+    }
+
+    private String categoryText(ForumPostModel post) {
+        if (!TextUtils.isEmpty(post.mapName)) {
+            return post.mapName;
+        }
+        return translateType(post.postType);
+    }
+
+    private String safeText(String value, String fallback) {
+        return TextUtils.isEmpty(value) ? fallback : value;
     }
 
     private String translateType(String postType) {
@@ -399,6 +573,33 @@ public class HomeFragment extends BasePageFragment {
                 return "日常";
             default:
                 return "其他";
+        }
+    }
+
+    private String translateToolType(String toolType) {
+        if (TextUtils.isEmpty(toolType)) {
+            return "";
+        }
+        switch (toolType) {
+            case "SMOKE":
+            case "SMOKE_GRENADE":
+                return "烟雾弹";
+            case "FLASH":
+            case "FLASHBANG":
+                return "闪光弹";
+            case "HE":
+            case "HE_GRENADE":
+                return "高爆手雷";
+            case "MOLOTOV":
+                return "燃烧瓶";
+            case "INCENDIARY":
+            case "INCENDIARY_GRENADE":
+                return "燃烧弹";
+            case "DECOY":
+            case "DECOY_GRENADE":
+                return "诱饵弹";
+            default:
+                return toolType;
         }
     }
 

@@ -9,6 +9,8 @@ public class ForumPostModel {
     public String title;
     public String mapName;
     public String createdByUsername;
+    public int authorLevel;
+    public int authorExperience;
     public String reviewStatus;
     public String reviewRemark;
     public String createdAt;
@@ -39,6 +41,7 @@ public class ForumPostModel {
     public String member5Role;
     public int version;
     public int likeCount;
+    public int commentCount;
     public int favoriteCount;
     public boolean liked;
     public boolean canEdit;

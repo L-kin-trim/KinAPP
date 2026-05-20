@@ -16,6 +16,7 @@ import com.example.kin.net.ApiException;
 import com.example.kin.ui.common.BasePageFragment;
 import com.example.kin.ui.common.KinUi;
 import com.example.kin.ui.common.RemoteImageLoader;
+import com.example.kin.ui.future.FutureFeatureDetailActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
@@ -28,7 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class LibraryFragment extends BasePageFragment {
-    private boolean favoriteMode = false;
+    private boolean favoriteMode = true;
     private int page = 0;
     private boolean lastPage = false;
     private final List<LibraryItem> items = new ArrayList<>();
@@ -41,7 +42,6 @@ public class LibraryFragment extends BasePageFragment {
         MainActivity activity = (MainActivity) requireActivity();
         activity.setTopBar("收藏库", "");
 
-        contentLayout.addView(headerCard(activity));
         listContainer = KinUi.vertical(activity);
         contentLayout.addView(listContainer, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -51,6 +51,40 @@ public class LibraryFragment extends BasePageFragment {
         loadMoreButton.setOnClickListener(v -> loadData(false));
         contentLayout.addView(loadMoreButton);
         loadData(true);
+    }
+
+    private View knowledgeUpgradeCard(MainActivity activity) {
+        MaterialCardView card = KinUi.card(activity);
+        LinearLayout body = KinUi.sectionContainer(activity, 18);
+        body.addView(KinUi.text(activity, "资料管理能力", 19, true));
+        body.addView(KinUi.muted(activity, "文件夹、标签、全文搜索、备注、离线包、导入导出和变更提醒按资料库场景组合。", 14));
+        MaterialButton folders = KinUi.outlinedButton(activity, "文件夹");
+        folders.setOnClickListener(v -> openFuture("library.folders"));
+        MaterialButton tags = KinUi.outlinedButton(activity, "标签/备注");
+        tags.setOnClickListener(v -> openFuture("library.tags"));
+        MaterialButton search = KinUi.outlinedButton(activity, "全文搜索");
+        search.setOnClickListener(v -> openFuture("library.full_text_search"));
+        LinearLayout row = KinUi.buttonRow(activity, folders, tags, search);
+        KinUi.margins(row, activity, 0, 14, 0, 0);
+        body.addView(row);
+        MaterialButton offline = KinUi.outlinedButton(activity, "离线包");
+        offline.setOnClickListener(v -> openFuture("library.offline_library"));
+        MaterialButton export = KinUi.outlinedButton(activity, "导入导出");
+        export.setOnClickListener(v -> openFuture("library.import_export"));
+        MaterialButton changes = KinUi.outlinedButton(activity, "变更提醒");
+        changes.setOnClickListener(v -> openFuture("library.change_reminder"));
+        LinearLayout row2 = KinUi.buttonRow(activity, offline, export, changes);
+        KinUi.margins(row2, activity, 0, 10, 0, 0);
+        body.addView(row2);
+        card.addView(body);
+        return card;
+    }
+
+    private void openFuture(String featureKey) {
+        MainActivity activity = (MainActivity) requireActivity();
+        android.content.Intent intent = new android.content.Intent(activity, FutureFeatureDetailActivity.class);
+        intent.putExtra(FutureFeatureDetailActivity.EXTRA_FEATURE_KEY, featureKey);
+        startActivity(intent);
     }
 
     private View headerCard(MainActivity activity) {
@@ -94,9 +128,6 @@ public class LibraryFragment extends BasePageFragment {
     }
 
     private void loadData(boolean reset) {
-        if (createButton != null) {
-            createButton.setVisibility(favoriteMode ? View.GONE : View.VISIBLE);
-        }
         if (reset) {
             items.clear();
             page = 0;
@@ -120,11 +151,7 @@ public class LibraryFragment extends BasePageFragment {
                 setLoading(false, "加载失败：" + exception.getMessage());
             }
         };
-        if (favoriteMode) {
-            activity.getRepository().getFavorites("", page, 10, callback);
-        } else {
-            activity.getRepository().getLibraryItems("", page, 10, callback);
-        }
+        activity.getRepository().getFavorites("", page, 10, callback);
     }
 
     private void renderItems(RemoteImageLoader imageLoader) {
@@ -132,6 +159,11 @@ public class LibraryFragment extends BasePageFragment {
         MainActivity activity = (MainActivity) requireActivity();
         for (LibraryItem item : items) {
             MaterialCardView card = KinUi.card(activity);
+            if (item.forumPostId > 0) {
+                card.setClickable(true);
+                card.setFocusable(true);
+                card.setOnClickListener(v -> activity.openPostDetail(item.forumPostId, false));
+            }
             LinearLayout body = KinUi.sectionContainer(activity, 16);
             TextView title = KinUi.text(activity, item.title, 18, true);
             TextView subtitle = KinUi.muted(activity, item.mapName + " · " + translate(item.postType), 13);
@@ -152,31 +184,6 @@ public class LibraryFragment extends BasePageFragment {
                 View strip = KinUi.imageStrip(activity, images, imageLoader);
                 KinUi.margins(strip, activity, 0, 12, 0, 0);
                 body.addView(strip);
-            }
-            if (item.forumPostId > 0) {
-                LinearLayout actions = new LinearLayout(activity);
-                actions.setOrientation(LinearLayout.HORIZONTAL);
-                MaterialButton openButton = KinUi.outlinedButton(activity, "打开原帖");
-                openButton.setOnClickListener(v -> activity.openPostDetail(item.forumPostId, false));
-                actions.addView(openButton);
-                if (favoriteMode) {
-                    MaterialButton unfavoriteButton = KinUi.outlinedButton(activity, "取消收藏");
-                    unfavoriteButton.setOnClickListener(v -> activity.getRepository().unfavoritePost(item.forumPostId, new ApiCallback<>() {
-                        @Override
-                        public void onSuccess(com.example.kin.model.FavoriteStatus data) {
-                            loadData(true);
-                        }
-
-                        @Override
-                        public void onError(ApiException exception) {
-                            setLoading(false, "取消收藏失败：" + exception.getMessage());
-                        }
-                    }));
-                    actions.addView(unfavoriteButton);
-                    KinUi.margins(unfavoriteButton, activity, 10, 0, 0, 0);
-                }
-                KinUi.margins(actions, activity, 0, 12, 0, 0);
-                body.addView(actions);
             }
             card.addView(body);
             listContainer.addView(card);

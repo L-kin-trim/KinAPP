@@ -134,6 +134,69 @@ public final class KinUi {
         view.setLayoutParams(marginLayoutParams);
     }
 
+    public static LinearLayout buttonRow(Context context, MaterialButton... buttons) {
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        for (int i = 0; i < buttons.length; i++) {
+            MaterialButton button = buttons[i];
+            stabilizeButton(context, button);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            if (i > 0) {
+                params.leftMargin = dp(context, 8);
+            }
+            row.addView(button, params);
+        }
+        return row;
+    }
+
+    public static LinearLayout buttonGrid(Context context, int columns, MaterialButton... buttons) {
+        LinearLayout grid = vertical(context);
+        int safeColumns = Math.max(1, columns);
+        LinearLayout row = null;
+        for (int i = 0; i < buttons.length; i++) {
+            int column = i % safeColumns;
+            if (column == 0) {
+                row = new LinearLayout(context);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                );
+                if (i > 0) {
+                    rowParams.topMargin = dp(context, 8);
+                }
+                grid.addView(row, rowParams);
+            }
+            MaterialButton button = buttons[i];
+            stabilizeButton(context, button);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            if (column > 0) {
+                params.leftMargin = dp(context, 8);
+            }
+            row.addView(button, params);
+        }
+        return grid;
+    }
+
+    public static void weightedButton(View view, Context context, int leftMarginDp) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        params.leftMargin = dp(context, leftMarginDp);
+        view.setLayoutParams(params);
+        if (view instanceof MaterialButton) {
+            MaterialButton button = (MaterialButton) view;
+            stabilizeButton(context, button);
+        }
+    }
+
+    private static void stabilizeButton(Context context, MaterialButton button) {
+        button.setSingleLine(true);
+        button.setEllipsize(TextUtils.TruncateAt.END);
+        button.setMinWidth(0);
+        button.setMinHeight(dp(context, 44));
+        button.setInsetTop(dp(context, 6));
+        button.setInsetBottom(dp(context, 6));
+    }
+
     public static LinearLayout sectionContainer(Context context, int padding) {
         LinearLayout layout = vertical(context);
         pad(layout, context, padding, padding);

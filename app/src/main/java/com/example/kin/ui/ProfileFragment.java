@@ -11,6 +11,8 @@ import com.example.kin.model.SessionUser;
 import com.example.kin.ui.admin.AdminCenterActivity;
 import com.example.kin.ui.common.BasePageFragment;
 import com.example.kin.ui.common.KinUi;
+import com.example.kin.ui.future.FutureFeatureCenterActivity;
+import com.example.kin.ui.future.FutureFeatureDetailActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 
@@ -71,13 +73,23 @@ public class ProfileFragment extends BasePageFragment {
                 v -> startActivity(new Intent(activity, DraftsActivity.class))));
         body.addView(actionButton(activity, "\u6d88\u606f\u4e2d\u5fc3",
                 v -> startActivity(new Intent(activity, MessagesActivity.class))));
+        body.addView(actionButton(activity, "每日签到",
+                v -> startActivity(new Intent(activity, CheckInActivity.class))));
         body.addView(actionButton(activity, "\u7559\u8a00\u677f",
                 v -> startActivity(new Intent(activity, MessageBoardActivity.class))));
         body.addView(actionButton(activity, "\u6211\u7684\u4e3e\u62a5",
                 v -> startActivity(new Intent(activity, MyReportsActivity.class))));
-        if (user.isAdmin()) {
+        body.addView(featureButton(activity, "账号安全", "user.security_center"));
+        body.addView(featureButton(activity, "成长/徽章", "user.level_xp"));
+        body.addView(featureButton(activity, "隐私与黑名单", "user.privacy_settings"));
+        body.addView(featureButton(activity, "通知偏好", "interaction.notification_preferences"));
+        body.addView(featureButton(activity, "战队空间", "team.space"));
+        body.addView(featureButton(activity, "作者中心", "analytics.creator_center"));
+        if (user != null && user.isAdmin()) {
             body.addView(actionButton(activity, "\u7ba1\u7406\u5458\u4e2d\u5fc3",
                     v -> startActivity(new Intent(activity, AdminCenterActivity.class))));
+            body.addView(actionButton(activity, "平台/接口诊断",
+                    v -> startActivity(new Intent(activity, FutureFeatureCenterActivity.class))));
         }
         if (sessionManager.isLoggedIn()) {
             body.addView(actionButton(activity, "\u9000\u51fa\u767b\u5f55", v -> {
@@ -88,6 +100,14 @@ public class ProfileFragment extends BasePageFragment {
         }
         card.addView(body);
         return card;
+    }
+
+    private View featureButton(MainActivity activity, String label, String featureKey) {
+        return actionButton(activity, label, v -> {
+            Intent intent = new Intent(activity, FutureFeatureDetailActivity.class);
+            intent.putExtra(FutureFeatureDetailActivity.EXTRA_FEATURE_KEY, featureKey);
+            startActivity(intent);
+        });
     }
 
     private View actionButton(MainActivity activity, String label, View.OnClickListener listener) {

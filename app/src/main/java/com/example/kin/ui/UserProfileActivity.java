@@ -17,7 +17,9 @@ import com.example.kin.model.UserProfileModel;
 import com.example.kin.net.ApiCallback;
 import com.example.kin.net.ApiException;
 import com.example.kin.ui.common.KinUi;
+import com.example.kin.ui.future.FutureFeatureDetailActivity;
 import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 
 public class UserProfileActivity extends AppCompatActivity {
@@ -85,6 +87,30 @@ public class UserProfileActivity extends AppCompatActivity {
         body.addView(info("徽章", TextUtils.join("、", data.badges)));
         card.addView(body);
         contentLayout.addView(card);
+        contentLayout.addView(growthCard());
+    }
+
+    private View growthCard() {
+        MaterialCardView card = KinUi.card(this);
+        LinearLayout body = KinUi.sectionContainer(this, 18);
+        body.addView(KinUi.text(this, "用户成长与安全", 18, true));
+        body.addView(KinUi.muted(this, "等级、经验、徽章、信誉、隐私、黑名单、安全中心、第三方登录和认证标识已接入。", 14));
+        body.addView(openFeatureButton("等级/徽章/成就", "user.level_xp"));
+        body.addView(openFeatureButton("隐私与黑名单", "user.privacy_settings"));
+        body.addView(openFeatureButton("账号安全中心", "user.security_center"));
+        card.addView(body);
+        return card;
+    }
+
+    private View openFeatureButton(String label, String featureKey) {
+        MaterialButton button = KinUi.outlinedButton(this, label);
+        KinUi.margins(button, this, 0, 10, 0, 0);
+        button.setOnClickListener(v -> {
+            android.content.Intent intent = new android.content.Intent(this, FutureFeatureDetailActivity.class);
+            intent.putExtra(FutureFeatureDetailActivity.EXTRA_FEATURE_KEY, featureKey);
+            startActivity(intent);
+        });
+        return button;
     }
 
     private View info(String label, String value) {

@@ -6,6 +6,8 @@ import com.example.kin.model.FavoriteStatus;
 import com.example.kin.model.DraftModel;
 import com.example.kin.model.ForumCommentModel;
 import com.example.kin.model.ForumPostModel;
+import com.example.kin.model.FutureAsyncTask;
+import com.example.kin.model.FutureFeatureRecord;
 import com.example.kin.model.HotKeywordModel;
 import com.example.kin.model.ImageUploadItem;
 import com.example.kin.model.LikeStatusModel;
@@ -16,6 +18,7 @@ import com.example.kin.model.PageResult;
 import com.example.kin.model.ReportModel;
 import com.example.kin.model.ReviewTemplateModel;
 import com.example.kin.model.AuditLogModel;
+import com.example.kin.model.CheckInSummary;
 import com.example.kin.model.SearchSuggestionModel;
 import com.example.kin.model.SessionUser;
 import com.example.kin.model.StationMessageModel;
@@ -41,6 +44,10 @@ public final class JsonUtils {
 
     public static long optLong(JSONObject json, String key) {
         return json == null ? 0L : json.optLong(key, 0L);
+    }
+
+    public static String displayTime(JSONObject json, String key) {
+        return DisplayTimeFormatter.formatDisplayTime(optString(json, key));
     }
 
     public static int optInt(JSONObject json, String key) {
@@ -105,13 +112,15 @@ public final class JsonUtils {
         post.title = firstNonEmpty(optString(json, "title"), optString(json, "propName"), optString(json, "tacticName"), shorten(optString(json, "content")));
         post.mapName = optString(json, "mapName");
         post.createdByUsername = optString(json, "createdByUsername");
+        post.authorLevel = optInt(json, "authorLevel");
+        post.authorExperience = optInt(json, "authorExperience");
         post.reviewStatus = optString(json, "reviewStatus");
         post.reviewRemark = optString(json, "reviewRemark");
-        post.createdAt = optString(json, "createdAt");
-        post.updatedAt = optString(json, "updatedAt");
-        post.approvedAt = optString(json, "approvedAt");
-        post.withdrawnAt = optString(json, "withdrawnAt");
-        post.editableUntil = optString(json, "editableUntil");
+        post.createdAt = displayTime(json, "createdAt");
+        post.updatedAt = displayTime(json, "updatedAt");
+        post.approvedAt = displayTime(json, "approvedAt");
+        post.withdrawnAt = displayTime(json, "withdrawnAt");
+        post.editableUntil = displayTime(json, "editableUntil");
         post.content = optString(json, "content");
         post.propName = optString(json, "propName");
         post.toolType = optString(json, "toolType");
@@ -135,8 +144,9 @@ public final class JsonUtils {
         post.member5Role = optString(json, "member5Role");
         post.version = optInt(json, "version");
         post.likeCount = optInt(json, "likeCount");
+        post.commentCount = optInt(json, "commentCount");
         post.favoriteCount = optInt(json, "favoriteCount");
-        post.liked = json.optBoolean("liked", false);
+        post.liked = json.optBoolean("liked", json.optBoolean("likedByMe", false));
         post.canEdit = json.optBoolean("canEdit", false);
         post.canWithdraw = json.optBoolean("canWithdraw", false);
         post.imageUrls.addAll(optStringList(json, "imageUrls"));
@@ -193,7 +203,7 @@ public final class JsonUtils {
         comment.content = optString(json, "content");
         comment.username = optString(json, "username");
         comment.replyToUsername = optString(json, "replyToUsername");
-        comment.createdAt = optString(json, "createdAt");
+        comment.createdAt = displayTime(json, "createdAt");
         comment.reviewStatus = optString(json, "reviewStatus");
         comment.reviewRemark = optString(json, "reviewRemark");
         comment.imageUrls.addAll(optStringList(json, "imageUrls"));
@@ -206,8 +216,8 @@ public final class JsonUtils {
         favoriteStatus.id = optLong(json, "id");
         favoriteStatus.forumPostId = optLong(json, "forumPostId");
         favoriteStatus.favorited = json.optBoolean("favorited", false);
-        favoriteStatus.updatedAt = optString(json, "updatedAt");
-        favoriteStatus.deletedAt = optString(json, "deletedAt");
+        favoriteStatus.updatedAt = displayTime(json, "updatedAt");
+        favoriteStatus.deletedAt = displayTime(json, "deletedAt");
         return favoriteStatus;
     }
 
@@ -228,8 +238,8 @@ public final class JsonUtils {
         message.recipientUsername = optString(json, "recipientUsername");
         message.content = optString(json, "content");
         message.messageType = optString(json, "messageType");
-        message.sentAt = optString(json, "sentAt");
-        message.readAt = optString(json, "readAt");
+        message.sentAt = displayTime(json, "sentAt");
+        message.readAt = displayTime(json, "readAt");
         message.read = json.optBoolean("read", json.optBoolean("isRead", false));
         return message;
     }
@@ -241,7 +251,7 @@ public final class JsonUtils {
         draft.title = optString(json, "title");
         draft.payloadJson = optString(json, "payloadJson");
         draft.autoSaved = json.optBoolean("autoSaved", false);
-        draft.updatedAt = optString(json, "updatedAt");
+        draft.updatedAt = displayTime(json, "updatedAt");
         return draft;
     }
 
@@ -262,8 +272,8 @@ public final class JsonUtils {
         model.content = optString(json, "content");
         model.status = optString(json, "status");
         model.statusNote = optString(json, "statusNote");
-        model.createdAt = optString(json, "createdAt");
-        model.updatedAt = optString(json, "updatedAt");
+        model.createdAt = displayTime(json, "createdAt");
+        model.updatedAt = displayTime(json, "updatedAt");
         return model;
     }
 
@@ -277,8 +287,8 @@ public final class JsonUtils {
         model.status = optString(json, "status");
         model.reporterUsername = optString(json, "reporterUsername");
         model.processNote = optString(json, "processNote");
-        model.createdAt = optString(json, "createdAt");
-        model.updatedAt = optString(json, "updatedAt");
+        model.createdAt = displayTime(json, "createdAt");
+        model.updatedAt = displayTime(json, "updatedAt");
         return model;
     }
 
@@ -299,7 +309,7 @@ public final class JsonUtils {
         model.targetType = optString(json, "targetType");
         model.targetId = firstNonEmpty(optString(json, "targetId"), String.valueOf(optLong(json, "targetId")));
         model.detail = firstNonEmpty(optString(json, "detail"), optString(json, "actionDetail"));
-        model.createdAt = optString(json, "createdAt");
+        model.createdAt = displayTime(json, "createdAt");
         return model;
     }
 
@@ -329,7 +339,7 @@ public final class JsonUtils {
         HotKeywordModel model = new HotKeywordModel();
         model.keyword = optString(json, "keyword");
         model.searchCount = optInt(json, "searchCount");
-        model.lastSearchedAt = optString(json, "lastSearchedAt");
+        model.lastSearchedAt = displayTime(json, "lastSearchedAt");
         return model;
     }
 
@@ -339,6 +349,96 @@ public final class JsonUtils {
         model.liked = json.optBoolean("liked", false);
         model.likeCount = optInt(json, "likeCount");
         return model;
+    }
+
+    public static FutureFeatureRecord parseFutureRecord(JSONObject json) {
+        FutureFeatureRecord record = new FutureFeatureRecord();
+        record.id = optLong(json, "id");
+        record.featureKey = firstNonEmpty(optString(json, "featureKey"), optString(json, "feature_key"));
+        record.featureGroup = firstNonEmpty(optString(json, "featureGroup"), optString(json, "feature_group"));
+        record.title = optString(json, "title");
+        record.summary = optString(json, "summary");
+        record.status = firstNonEmpty(optString(json, "status"), "DRAFT");
+        record.ownerUsername = firstNonEmpty(optString(json, "ownerUsername"), optString(json, "createdByUsername"));
+        Object payload = json == null ? null : json.opt("payloadJson");
+        if (payload instanceof JSONObject || payload instanceof JSONArray) {
+            record.payloadJson = payload.toString();
+        } else {
+            record.payloadJson = optString(json, "payloadJson");
+        }
+        record.createdAt = displayTime(json, "createdAt");
+        record.updatedAt = displayTime(json, "updatedAt");
+        return record;
+    }
+
+    public static FutureAsyncTask parseFutureTask(JSONObject json) {
+        FutureAsyncTask task = new FutureAsyncTask();
+        task.id = optLong(json, "id");
+        task.taskId = firstNonEmpty(optString(json, "taskId"), optString(json, "id"));
+        task.taskType = firstNonEmpty(optString(json, "taskType"), optString(json, "type"));
+        task.featureKey = optString(json, "featureKey");
+        task.title = firstNonEmpty(optString(json, "title"), optString(json, "taskName"));
+        task.status = firstNonEmpty(optString(json, "status"), "PENDING");
+        task.progressPercent = optInt(json, "progressPercent");
+        task.progressText = firstNonEmpty(optString(json, "progressText"), task.progressPercent + "%");
+        task.failureReason = firstNonEmpty(optString(json, "failureReason"), optString(json, "errorMessage"));
+        Object result = json == null ? null : json.opt("resultJson");
+        task.resultJson = result == null ? "" : result.toString();
+        task.createdAt = displayTime(json, "createdAt");
+        task.updatedAt = displayTime(json, "updatedAt");
+        return task;
+    }
+
+    public static CheckInSummary parseCheckInSummary(JSONObject json) {
+        CheckInSummary summary = CheckInSummary.currentMonthPreview();
+        summary.signedToday = json != null && json.optBoolean("signedToday", json.optBoolean("checkedInToday", false));
+        summary.currentStreakDays = optInt(json, "currentStreakDays");
+        if (summary.currentStreakDays == 0) {
+            summary.currentStreakDays = optInt(json, "streakDays");
+        }
+        summary.totalSignedDays = optInt(json, "totalSignedDays");
+        if (summary.totalSignedDays == 0) {
+            summary.totalSignedDays = optInt(json, "totalDays");
+        }
+        int responseYear = optInt(json, "year");
+        int responseMonth = optInt(json, "month");
+        if (responseYear > 0) {
+            summary.year = responseYear;
+        }
+        if (responseMonth > 0) {
+            summary.month = responseMonth;
+        }
+
+        JSONArray days = optArray(json, "signedDays");
+        if (days == null) {
+            days = optArray(json, "checkInDays");
+        }
+        if (days == null) {
+            days = optArray(json, "records");
+        }
+        if (days != null) {
+            for (int i = 0; i < days.length(); i++) {
+                Object item = days.opt(i);
+                if (item instanceof Number) {
+                    summary.signedDays.add(((Number) item).intValue());
+                } else if (item instanceof JSONObject) {
+                    JSONObject day = (JSONObject) item;
+                    int dayOfMonth = day.optInt("dayOfMonth", day.optInt("day", 0));
+                    if (dayOfMonth > 0) {
+                        summary.signedDays.add(dayOfMonth);
+                    }
+                } else {
+                    try {
+                        int dayOfMonth = Integer.parseInt(String.valueOf(item));
+                        if (dayOfMonth > 0) {
+                            summary.signedDays.add(dayOfMonth);
+                        }
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+            }
+        }
+        return summary;
     }
 
     public static String shorten(String content) {
