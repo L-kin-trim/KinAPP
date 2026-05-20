@@ -41,6 +41,10 @@ public class ApiClient {
         executeJson("POST", path, null, body, authRequired, callback);
     }
 
+    public void post(String path, Map<String, String> query, boolean authRequired, ApiCallback<JSONObject> callback) {
+        executeJson("POST", path, query, null, authRequired, callback);
+    }
+
     public void postJson(String path, Map<String, String> query, JSONObject body, boolean authRequired, ApiCallback<JSONObject> callback) {
         executeJson("POST", path, query, body, authRequired, callback);
     }

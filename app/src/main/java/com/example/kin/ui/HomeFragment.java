@@ -539,7 +539,8 @@ public class HomeFragment extends BasePageFragment {
     }
 
     private String buildFeedMeta(ForumPostModel post) {
-        return safeText(post.createdAt, "") + " · " + translateType(post.postType);
+        String map = TextUtils.isEmpty(post.mapName) ? "" : " \u00b7 " + post.mapName;
+        return safeText(post.createdAt, "") + map + " \u00b7 " + translateType(post.postType);
     }
 
     private String buildFeedSummary(ForumPostModel post) {

@@ -7,10 +7,15 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import android.text.TextUtils;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.FileProvider;
 
+import com.example.kin.ui.common.KinUi;
 import com.example.kin.util.AppExecutors;
 
 import org.json.JSONArray;
@@ -33,6 +38,10 @@ public class GithubReleaseUpdater {
     private boolean checkInFlight;
     private boolean checkCompleted;
     private boolean dialogShown;
+    private boolean downloadInFlight;
+    private AlertDialog progressDialog;
+    private ProgressBar downloadProgressBar;
+    private TextView downloadProgressText;
 
     public GithubReleaseUpdater(Activity activity) {
         this.activity = activity;
@@ -81,45 +90,130 @@ public class GithubReleaseUpdater {
             return;
         }
         dialogShown = true;
-        new AlertDialog.Builder(activity)
-                .setTitle("发现新版本 " + release.displayName())
-                .setMessage(TextUtils.isEmpty(release.body) ? "是否下载并安装最新版本？" : release.body)
-                .setPositiveButton("立即更新", (dialog, which) -> downloadAndInstall(release))
-                .setNegativeButton("稍后再说", null)
+        AlertDialog dialog = new AlertDialog.Builder(activity)
+                .setTitle("\u53d1\u73b0\u65b0\u7248\u672c " + release.displayName())
+                .setMessage(TextUtils.isEmpty(release.body) ? "\u662f\u5426\u4e0b\u8f7d\u5e76\u5b89\u88c5\u6700\u65b0\u7248\u672c\uff1f" : release.body)
+                .setPositiveButton("\u7acb\u5373\u66f4\u65b0", null)
+                .setNegativeButton("\u7a0d\u540e\u518d\u8bf4", null)
                 .show();
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            dialog.dismiss();
+            downloadAndInstall(release);
+        });
     }
 
     private void downloadAndInstall(ReleaseInfo release) {
+        if (downloadInFlight) {
+            return;
+        }
+        File cachedApk = apkFileFor(release);
+        if (isCompleteApk(cachedApk, release)) {
+            installApk(cachedApk);
+            return;
+        }
+        downloadInFlight = true;
+        showDownloadProgressDialog(release);
         AppExecutors.io().execute(() -> {
             try {
                 File apkFile = downloadApk(release);
-                AppExecutors.main(() -> installApk(apkFile));
+                AppExecutors.main(() -> {
+                    downloadInFlight = false;
+                    dismissProgressDialog();
+                    installApk(apkFile);
+                });
             } catch (Exception exception) {
-                AppExecutors.main(() -> new AlertDialog.Builder(activity)
-                        .setTitle("更新失败")
-                        .setMessage(TextUtils.isEmpty(exception.getMessage()) ? "安装包下载失败，请稍后重试。" : exception.getMessage())
-                        .setPositiveButton("知道了", null)
-                        .show());
+                AppExecutors.main(() -> {
+                    downloadInFlight = false;
+                    dismissProgressDialog();
+                    new AlertDialog.Builder(activity)
+                            .setTitle("\u66f4\u65b0\u5931\u8d25")
+                            .setMessage(TextUtils.isEmpty(exception.getMessage()) ? "\u5b89\u88c5\u5305\u4e0b\u8f7d\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002" : exception.getMessage())
+                            .setPositiveButton("\u77e5\u9053\u4e86", null)
+                            .show();
+                });
             }
         });
     }
 
     private File downloadApk(ReleaseInfo release) throws Exception {
         HttpURLConnection connection = openConnection(release.apkUrl);
+        int status = connection.getResponseCode();
+        if (status < 200 || status >= 300) {
+            throw new IllegalStateException("\u4e0b\u8f7d\u5931\u8d25\uff1aHTTP " + status);
+        }
         File updateDir = new File(activity.getCacheDir(), "updates");
         if (!updateDir.exists() && !updateDir.mkdirs()) {
-            throw new IllegalStateException("无法创建更新缓存目录");
+            throw new IllegalStateException("\u65e0\u6cd5\u521b\u5efa\u66f4\u65b0\u7f13\u5b58\u76ee\u5f55");
         }
-        File apkFile = new File(updateDir, "KinAPP-" + release.safeVersionName() + ".apk");
+        File apkFile = apkFileFor(release);
+        long totalBytes = release.apkSize > 0L ? release.apkSize : connection.getContentLengthLong();
+        publishDownloadProgress(0L, totalBytes);
         try (InputStream inputStream = connection.getInputStream();
              FileOutputStream outputStream = new FileOutputStream(apkFile)) {
             byte[] buffer = new byte[8192];
             int length;
+            long downloadedBytes = 0L;
             while ((length = inputStream.read(buffer)) != -1) {
                 outputStream.write(buffer, 0, length);
+                downloadedBytes += length;
+                publishDownloadProgress(downloadedBytes, totalBytes);
             }
         }
         return apkFile;
+    }
+
+    private void showDownloadProgressDialog(ReleaseInfo release) {
+        if (activity.isFinishing() || activity.isDestroyed()) {
+            return;
+        }
+        LinearLayout root = new LinearLayout(activity);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(KinUi.dp(activity, 4), KinUi.dp(activity, 8), KinUi.dp(activity, 4), KinUi.dp(activity, 2));
+
+        downloadProgressText = KinUi.muted(activity, "\u51c6\u5907\u4e0b\u8f7d...", 14);
+        root.addView(downloadProgressText);
+
+        downloadProgressBar = new ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal);
+        downloadProgressBar.setMax(100);
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        progressParams.topMargin = KinUi.dp(activity, 12);
+        root.addView(downloadProgressBar, progressParams);
+
+        progressDialog = new AlertDialog.Builder(activity)
+                .setTitle("\u6b63\u5728\u4e0b\u8f7d " + release.displayName())
+                .setView(root)
+                .setCancelable(false)
+                .show();
+    }
+
+    private void publishDownloadProgress(long downloadedBytes, long totalBytes) {
+        AppExecutors.main(() -> {
+            if (downloadProgressBar == null || downloadProgressText == null) {
+                return;
+            }
+            if (totalBytes > 0L) {
+                int progress = (int) Math.min(100L, downloadedBytes * 100L / totalBytes);
+                downloadProgressBar.setIndeterminate(false);
+                downloadProgressBar.setProgress(progress);
+                downloadProgressText.setText("\u5df2\u4e0b\u8f7d " + formatBytes(downloadedBytes)
+                        + " / " + formatBytes(totalBytes) + " (" + progress + "%)");
+            } else {
+                downloadProgressBar.setIndeterminate(true);
+                downloadProgressText.setText("\u5df2\u4e0b\u8f7d " + formatBytes(downloadedBytes));
+            }
+        });
+    }
+
+    private void dismissProgressDialog() {
+        if (progressDialog != null && progressDialog.isShowing()) {
+            progressDialog.dismiss();
+        }
+        progressDialog = null;
+        downloadProgressBar = null;
+        downloadProgressText = null;
     }
 
     private void installApk(File apkFile) {
@@ -135,6 +229,23 @@ public class GithubReleaseUpdater {
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         activity.startActivity(intent);
+    }
+
+    private File apkFileFor(ReleaseInfo release) {
+        File updateDir = new File(activity.getCacheDir(), "updates");
+        return new File(updateDir, "KinAPP-" + release.safeVersionName() + ".apk");
+    }
+
+    private boolean isCompleteApk(File apkFile, ReleaseInfo release) {
+        return apkFile.exists() && apkFile.isFile() && apkFile.length() > 0L
+                && (release.apkSize <= 0L || apkFile.length() == release.apkSize);
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes <= 0L) {
+            return "0 MB";
+        }
+        return String.format(Locale.ROOT, "%.1f MB", bytes / 1024f / 1024f);
     }
 
     private HttpURLConnection openConnection(String url) throws Exception {
@@ -172,17 +283,20 @@ public class GithubReleaseUpdater {
         final String name;
         final String body;
         final String apkUrl;
+        final long apkSize;
 
-        private ReleaseInfo(String tagName, String name, String body, String apkUrl) {
+        private ReleaseInfo(String tagName, String name, String body, String apkUrl, long apkSize) {
             this.tagName = tagName;
             this.name = name;
             this.body = body;
             this.apkUrl = apkUrl;
+            this.apkSize = apkSize;
         }
 
         static ReleaseInfo fromJson(JSONObject json) {
             JSONArray assets = json.optJSONArray("assets");
             String apkUrl = "";
+            long apkSize = 0L;
             if (assets != null) {
                 for (int i = 0; i < assets.length(); i++) {
                     JSONObject asset = assets.optJSONObject(i);
@@ -192,6 +306,7 @@ public class GithubReleaseUpdater {
                     String assetName = asset.optString("name");
                     if (!TextUtils.isEmpty(assetName) && assetName.toLowerCase(Locale.ROOT).endsWith(".apk")) {
                         apkUrl = asset.optString("browser_download_url");
+                        apkSize = asset.optLong("size", 0L);
                         break;
                     }
                 }
@@ -200,7 +315,8 @@ public class GithubReleaseUpdater {
                     json.optString("tag_name"),
                     json.optString("name"),
                     json.optString("body"),
-                    apkUrl
+                    apkUrl,
+                    apkSize
             );
         }
 

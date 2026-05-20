@@ -192,7 +192,7 @@ public class KinRepository {
     }
 
     public void likePost(long postId, ApiCallback<LikeStatusModel> callback) {
-        apiClient.postJson("/api/forum/posts/" + postId + "/like", new JSONObject(), true, modelCallback(callback, JsonUtils::parseLikeStatus));
+        apiClient.post("/api/forum/posts/" + postId + "/like", null, true, modelCallback(callback, JsonUtils::parseLikeStatus));
     }
 
     public void unlikePost(long postId, ApiCallback<LikeStatusModel> callback) {
