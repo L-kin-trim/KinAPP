@@ -10,7 +10,9 @@ import com.example.kin.model.SessionUser;
 
 public class SessionManager {
     private static final String DEFAULT_BASE_URL = "http://47.105.102.113:9126";
-    public static final long SESSION_TTL_MS = 30L * 24L * 60L * 60L * 1000L;
+    public static final long REMEMBER_LOGIN_TTL_MS = 30L * 24L * 60L * 60L * 1000L;
+    private static final long SESSION_REFRESH_INTERVAL_MS = 24L * 60L * 60L * 1000L;
+    private static final long TOKEN_REFRESH_INTERVAL_MS = 60L * 60L * 1000L;
 
     private final SessionDao sessionDao;
 
@@ -54,12 +56,12 @@ public class SessionManager {
         entity.role = TextUtils.isEmpty(user.role) ? "USER" : user.role;
         entity.loggedInAt = user.loggedInAt > 0 ? user.loggedInAt : now;
         entity.updatedAt = now;
-        entity.expiresAt = now + SESSION_TTL_MS;
+        entity.expiresAt = now + REMEMBER_LOGIN_TTL_MS;
         sessionDao.save(entity);
     }
 
     public long buildSessionExpiryFromNow() {
-        return System.currentTimeMillis() + SESSION_TTL_MS;
+        return System.currentTimeMillis() + REMEMBER_LOGIN_TTL_MS;
     }
 
     public void clearSession() {
@@ -71,11 +73,21 @@ public class SessionManager {
         if (entity == null || TextUtils.isEmpty(entity.token)) {
             return null;
         }
-        if (entity.expiresAt <= System.currentTimeMillis()) {
+        long now = System.currentTimeMillis();
+        if (entity.expiresAt <= now) {
             sessionDao.clear();
             return null;
         }
+        if (entity.expiresAt - now < REMEMBER_LOGIN_TTL_MS - SESSION_REFRESH_INTERVAL_MS) {
+            entity.expiresAt = now + REMEMBER_LOGIN_TTL_MS;
+            sessionDao.save(entity);
+        }
         return entity;
+    }
+
+    public boolean shouldRefreshToken() {
+        SessionEntity entity = getValidSession();
+        return entity != null && System.currentTimeMillis() - entity.updatedAt >= TOKEN_REFRESH_INTERVAL_MS;
     }
 
     private String safe(String value) {

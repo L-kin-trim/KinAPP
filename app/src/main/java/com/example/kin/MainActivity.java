@@ -215,7 +215,13 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
     }
 
     private void ensureSessionAlive() {
-        if (repository.getSessionManager().isLoggedIn() || autoLoginInFlight) {
+        if (autoLoginInFlight) {
+            return;
+        }
+        if (repository.getSessionManager().isLoggedIn()) {
+            if (repository.getSessionManager().shouldRefreshToken()) {
+                refreshRememberedLogin();
+            }
             return;
         }
         autoLoginInFlight = true;
@@ -232,6 +238,24 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
             public void onError(ApiException exception) {
                 autoLoginInFlight = false;
                 openAuthAndFinish();
+            }
+        });
+    }
+
+    private void refreshRememberedLogin() {
+        autoLoginInFlight = true;
+        repository.tryAutoLogin(new ApiCallback<>() {
+            @Override
+            public void onSuccess(SessionUser data) {
+                autoLoginInFlight = false;
+                refreshToolbarSubtitle();
+                ensureDailyCheckIn();
+            }
+
+            @Override
+            public void onError(ApiException exception) {
+                autoLoginInFlight = false;
+                refreshToolbarSubtitle();
             }
         });
     }

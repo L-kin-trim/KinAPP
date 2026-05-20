@@ -93,7 +93,7 @@ public class PostDetailActivity extends AppCompatActivity {
 
         ScrollView scrollView = new ScrollView(this);
         contentLayout = KinUi.vertical(this);
-        contentLayout.setPadding(KinUi.dp(this, 18), KinUi.dp(this, 12), KinUi.dp(this, 18), KinUi.dp(this, 24));
+        contentLayout.setPadding(KinUi.dp(this, 8), KinUi.dp(this, 12), KinUi.dp(this, 8), KinUi.dp(this, 24));
         progressBar = new ProgressBar(this);
         statusView = KinUi.muted(this, "", 13);
         statusView.setVisibility(View.GONE);
@@ -142,7 +142,7 @@ public class PostDetailActivity extends AppCompatActivity {
         contentLayout.addView(progressBar);
         contentLayout.addView(statusView);
 
-        LinearLayout body = KinUi.sectionContainer(this, 18);
+        LinearLayout body = KinUi.sectionContainer(this, 8);
         body.addView(KinUi.text(this, currentPost.title, 22, true));
         TextView meta = KinUi.muted(this,
                 currentPost.createdByUsername + " · " + currentPost.createdAt,
