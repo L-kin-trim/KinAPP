@@ -10,8 +10,8 @@ android {
         applicationId "com.example.kin"
         minSdk 31
         targetSdk 35
-        versionCode 105
-        versionName "KinAPP Beta1.0.5"
+        versionCode 106
+        versionName "KinAPP Beta1.0.6"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }

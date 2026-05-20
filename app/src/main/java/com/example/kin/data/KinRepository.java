@@ -414,11 +414,15 @@ public class KinRepository {
     }
 
     public void favoritePost(long postId, ApiCallback<FavoriteStatus> callback) {
-        apiClient.postJson("/api/my/library/favorites/" + postId, new JSONObject(), true, modelCallback(callback, JsonUtils::parseFavoriteStatus));
+        apiClient.post("/api/my/library/favorites/" + postId, null, true, modelCallback(callback, JsonUtils::parseFavoriteStatus));
     }
 
     public void unfavoritePost(long postId, ApiCallback<FavoriteStatus> callback) {
         apiClient.deleteJson("/api/my/library/favorites/" + postId, null, true, modelCallback(callback, JsonUtils::parseFavoriteStatus));
+    }
+
+    public void getFavoriteStatus(long postId, ApiCallback<FavoriteStatus> callback) {
+        apiClient.get("/api/my/library/favorites/" + postId, null, true, modelCallback(callback, JsonUtils::parseFavoriteStatus));
     }
 
     public void getFavorites(String postType, int page, int size, ApiCallback<PageResult<LibraryItem>> callback) {

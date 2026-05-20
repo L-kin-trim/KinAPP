@@ -60,6 +60,9 @@ public class PostDetailActivity extends AppCompatActivity {
     private TextInputEditText commentEdit;
     private ImageView likeActionIcon;
     private TextView likeActionLabel;
+    private ImageView favoriteActionIcon;
+    private TextView favoriteActionLabel;
+    private boolean postFavorited;
     private long replyTargetCommentId;
     private final List<Uri> commentImageUris = new ArrayList<>();
 
@@ -112,6 +115,7 @@ public class PostDetailActivity extends AppCompatActivity {
             public void onSuccess(ForumPostModel data) {
                 currentPost = data;
                 renderPost();
+                loadInteractionStatus();
                 loadComments();
             }
 
@@ -214,21 +218,11 @@ public class PostDetailActivity extends AppCompatActivity {
         likeAction.setOnClickListener(v -> toggleLike());
         applyLikeActionState();
 
-        ImageView favoriteIcon = new ImageView(this);
-        TextView favoriteLabel = KinUi.muted(this, "收藏", 12);
-        View favoriteAction = buildIconAction(favoriteIcon, favoriteLabel, R.drawable.ic_action_favorite, "收藏");
-        favoriteAction.setOnClickListener(v -> repository.favoritePost(postId, new ApiCallback<>() {
-            @Override
-            public void onSuccess(com.example.kin.model.FavoriteStatus data) {
-                favoriteLabel.setText(data.favorited ? "已收藏" : "收藏");
-                favoriteIcon.setColorFilter(getColor(data.favorited ? R.color.kin_warning : R.color.kin_text_muted));
-            }
-
-            @Override
-            public void onError(ApiException exception) {
-                setLoading(false, "收藏失败：" + exception.getMessage());
-            }
-        }));
+        favoriteActionIcon = new ImageView(this);
+        favoriteActionLabel = KinUi.muted(this, "", 12);
+        View favoriteAction = buildIconAction(favoriteActionIcon, favoriteActionLabel, R.drawable.ic_action_favorite, "收藏");
+        favoriteAction.setOnClickListener(v -> toggleFavorite());
+        applyFavoriteActionState();
 
         ImageView reportIcon = new ImageView(this);
         TextView reportLabel = KinUi.muted(this, "举报", 12);
@@ -265,6 +259,14 @@ public class PostDetailActivity extends AppCompatActivity {
         }
         likeActionLabel.setText((currentPost.liked ? "已赞 " : "点赞 ") + currentPost.likeCount);
         likeActionIcon.setColorFilter(getColor(currentPost.liked ? R.color.kin_danger : R.color.kin_text_muted));
+    }
+
+    private void applyFavoriteActionState() {
+        if (favoriteActionIcon == null || favoriteActionLabel == null) {
+            return;
+        }
+        favoriteActionLabel.setText(postFavorited ? "已收藏" : "收藏");
+        favoriteActionIcon.setColorFilter(getColor(postFavorited ? R.color.kin_warning : R.color.kin_text_muted));
     }
 
     private View buildPreviewImageStrip(List<String> urls) {
@@ -472,6 +474,55 @@ public class PostDetailActivity extends AppCompatActivity {
             repository.unlikePost(postId, callback);
         } else {
             repository.likePost(postId, callback);
+        }
+    }
+
+    private void loadInteractionStatus() {
+        repository.getLikeStatus(postId, new ApiCallback<>() {
+            @Override
+            public void onSuccess(LikeStatusModel data) {
+                if (currentPost == null) {
+                    return;
+                }
+                currentPost.liked = data.liked;
+                currentPost.likeCount = data.likeCount;
+                applyLikeActionState();
+            }
+
+            @Override
+            public void onError(ApiException exception) {
+            }
+        });
+        repository.getFavoriteStatus(postId, new ApiCallback<>() {
+            @Override
+            public void onSuccess(com.example.kin.model.FavoriteStatus data) {
+                postFavorited = data.favorited;
+                applyFavoriteActionState();
+            }
+
+            @Override
+            public void onError(ApiException exception) {
+            }
+        });
+    }
+
+    private void toggleFavorite() {
+        ApiCallback<com.example.kin.model.FavoriteStatus> callback = new ApiCallback<>() {
+            @Override
+            public void onSuccess(com.example.kin.model.FavoriteStatus data) {
+                postFavorited = data.favorited;
+                applyFavoriteActionState();
+            }
+
+            @Override
+            public void onError(ApiException exception) {
+                setLoading(false, "收藏失败：" + exception.getMessage());
+            }
+        };
+        if (postFavorited) {
+            repository.unfavoritePost(postId, callback);
+        } else {
+            repository.favoritePost(postId, callback);
         }
     }
 
