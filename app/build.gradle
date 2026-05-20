@@ -10,8 +10,8 @@ android {
         applicationId "com.example.kin"
         minSdk 31
         targetSdk 35
-        versionCode 106
-        versionName "KinAPP Beta1.0.6"
+        versionCode 107
+        versionName "KinAPP Beta1.0.7"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -35,6 +35,7 @@ dependencies {
     implementation libs.constraintlayout
     implementation libs.fragment
     implementation libs.viewpager2
+    implementation libs.swipe.refresh.layout
     implementation libs.room.runtime
     implementation libs.security.crypto
     implementation libs.mlkit.text.recognition

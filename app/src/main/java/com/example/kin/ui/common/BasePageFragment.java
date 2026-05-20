@@ -12,6 +12,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.kin.R;
 
@@ -19,10 +20,15 @@ public abstract class BasePageFragment extends Fragment {
     protected LinearLayout contentLayout;
     protected ProgressBar progressBar;
     protected TextView statusView;
+    protected SwipeRefreshLayout refreshLayout;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        refreshLayout = new SwipeRefreshLayout(requireContext());
+        refreshLayout.setColorSchemeResources(R.color.kin_accent, R.color.kin_warning, R.color.kin_success);
+        refreshLayout.setOnRefreshListener(this::onRefreshRequested);
+
         ScrollView scrollView = new ScrollView(requireContext());
         scrollView.setFillViewport(true);
         scrollView.setBackgroundColor(requireContext().getColor(KinUi.isNight(requireContext()) ? R.color.kin_dark_bg : R.color.kin_light_bg));
@@ -40,11 +46,25 @@ public abstract class BasePageFragment extends Fragment {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
+        refreshLayout.addView(scrollView, new SwipeRefreshLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+        ));
         onPageReady();
-        return scrollView;
+        return refreshLayout;
     }
 
     protected abstract void onPageReady();
+
+    protected void onRefreshRequested() {
+        finishRefreshing();
+    }
+
+    protected void finishRefreshing() {
+        if (refreshLayout != null) {
+            refreshLayout.setRefreshing(false);
+        }
+    }
 
     protected void setLoading(boolean loading, String message) {
         if (progressBar != null) {

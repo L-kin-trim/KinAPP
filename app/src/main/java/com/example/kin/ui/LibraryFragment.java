@@ -1,8 +1,11 @@
 package com.example.kin.ui;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -16,148 +19,228 @@ import com.example.kin.net.ApiException;
 import com.example.kin.ui.common.BasePageFragment;
 import com.example.kin.ui.common.KinUi;
 import com.example.kin.ui.common.RemoteImageLoader;
-import com.example.kin.ui.future.FutureFeatureDetailActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
-import org.json.JSONObject;
-
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.TreeSet;
 
 public class LibraryFragment extends BasePageFragment {
-    private boolean favoriteMode = true;
-    private int page = 0;
-    private boolean lastPage = false;
-    private final List<LibraryItem> items = new ArrayList<>();
+    private static final String SEARCH_PREFS = "library_search_history";
+    private static final String SEARCH_HISTORY_KEY = "terms";
+    private static final int MAX_SEARCH_HISTORY = 8;
+
+    private final List<LibraryItem> allItems = new ArrayList<>();
+    private LinearLayout mapFilterLayout;
     private LinearLayout listContainer;
     private MaterialButton loadMoreButton;
-    private MaterialButton createButton;
+    private String selectedMap = "";
+    private String searchQuery = "";
+    private int page = 0;
+    private boolean lastPage = false;
 
     @Override
     protected void onPageReady() {
         MainActivity activity = (MainActivity) requireActivity();
-        activity.setTopBar("收藏库", "");
+        activity.setTopBar("\u6536\u85cf\u5e93", "");
+
+        TextView archiveTitle = KinUi.muted(activity, "\u6309\u5730\u56fe\u5f52\u6863", 13);
+        contentLayout.addView(archiveTitle);
+
+        HorizontalScrollView scrollView = new HorizontalScrollView(activity);
+        scrollView.setHorizontalScrollBarEnabled(false);
+        mapFilterLayout = new LinearLayout(activity);
+        mapFilterLayout.setOrientation(LinearLayout.HORIZONTAL);
+        scrollView.addView(mapFilterLayout);
+        KinUi.margins(scrollView, activity, 0, 8, 0, 12);
+        contentLayout.addView(scrollView);
 
         listContainer = KinUi.vertical(activity);
         contentLayout.addView(listContainer, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
-        loadMoreButton = KinUi.outlinedButton(activity, "加载更多");
+
+        loadMoreButton = KinUi.outlinedButton(activity, "\u52a0\u8f7d\u66f4\u591a");
         loadMoreButton.setOnClickListener(v -> loadData(false));
         contentLayout.addView(loadMoreButton);
+
+        rebuildMapFilters(activity);
         loadData(true);
     }
 
-    private View knowledgeUpgradeCard(MainActivity activity) {
-        MaterialCardView card = KinUi.card(activity);
-        LinearLayout body = KinUi.sectionContainer(activity, 18);
-        body.addView(KinUi.text(activity, "资料管理能力", 19, true));
-        body.addView(KinUi.muted(activity, "文件夹、标签、全文搜索、备注、离线包、导入导出和变更提醒按资料库场景组合。", 14));
-        MaterialButton folders = KinUi.outlinedButton(activity, "文件夹");
-        folders.setOnClickListener(v -> openFuture("library.folders"));
-        MaterialButton tags = KinUi.outlinedButton(activity, "标签/备注");
-        tags.setOnClickListener(v -> openFuture("library.tags"));
-        MaterialButton search = KinUi.outlinedButton(activity, "全文搜索");
-        search.setOnClickListener(v -> openFuture("library.full_text_search"));
-        LinearLayout row = KinUi.buttonRow(activity, folders, tags, search);
-        KinUi.margins(row, activity, 0, 14, 0, 0);
-        body.addView(row);
-        MaterialButton offline = KinUi.outlinedButton(activity, "离线包");
-        offline.setOnClickListener(v -> openFuture("library.offline_library"));
-        MaterialButton export = KinUi.outlinedButton(activity, "导入导出");
-        export.setOnClickListener(v -> openFuture("library.import_export"));
-        MaterialButton changes = KinUi.outlinedButton(activity, "变更提醒");
-        changes.setOnClickListener(v -> openFuture("library.change_reminder"));
-        LinearLayout row2 = KinUi.buttonRow(activity, offline, export, changes);
-        KinUi.margins(row2, activity, 0, 10, 0, 0);
-        body.addView(row2);
-        card.addView(body);
-        return card;
+    @Override
+    protected void onRefreshRequested() {
+        loadData(true);
     }
 
-    private void openFuture(String featureKey) {
-        MainActivity activity = (MainActivity) requireActivity();
-        android.content.Intent intent = new android.content.Intent(activity, FutureFeatureDetailActivity.class);
-        intent.putExtra(FutureFeatureDetailActivity.EXTRA_FEATURE_KEY, featureKey);
-        startActivity(intent);
-    }
-
-    private View headerCard(MainActivity activity) {
-        MaterialCardView card = KinUi.card(activity);
-        LinearLayout body = KinUi.sectionContainer(activity, 18);
-        TextView title = KinUi.text(activity, "个人库 + 收藏夹", 22, true);
-        TextView subtitle = KinUi.muted(activity, "既能保存自己的投掷/战术记录，也能把论坛里实用内容直接收进库里。", 14);
-        LinearLayout chips = new LinearLayout(activity);
-        chips.setOrientation(LinearLayout.HORIZONTAL);
-        Chip selfChip = KinUi.chip(activity, "我的条目");
-        Chip favoriteChip = KinUi.chip(activity, "我的收藏");
-        selfChip.setCheckable(true);
-        favoriteChip.setCheckable(true);
-        selfChip.setChecked(!favoriteMode);
-        favoriteChip.setChecked(favoriteMode);
-        selfChip.setOnClickListener(v -> {
-            favoriteMode = false;
-            loadData(true);
-        });
-        favoriteChip.setOnClickListener(v -> {
-            favoriteMode = true;
-            loadData(true);
-        });
-        chips.addView(selfChip);
-        chips.addView(favoriteChip);
-        KinUi.margins(favoriteChip, activity, 10, 0, 0, 0);
-
-        createButton = KinUi.filledButton(activity, "新建条目");
-        createButton.setOnClickListener(v -> showCreateDialog());
-
-        body.addView(title);
-        KinUi.margins(subtitle, activity, 0, 8, 0, 0);
-        body.addView(subtitle);
-        KinUi.margins(chips, activity, 0, 14, 0, 0);
-        body.addView(chips);
-        KinUi.margins(createButton, activity, 0, 14, 0, 0);
-        createButton.setVisibility(favoriteMode ? View.GONE : View.VISIBLE);
-        body.addView(createButton);
-        card.addView(body);
-        return card;
+    public void openSearch() {
+        showSearchDialog();
     }
 
     private void loadData(boolean reset) {
         if (reset) {
-            items.clear();
+            allItems.clear();
             page = 0;
             lastPage = false;
         }
-        setLoading(true, "正在同步收藏库...");
+        setLoading(true, "\u6b63\u5728\u540c\u6b65\u6536\u85cf\u5e93...");
         MainActivity activity = (MainActivity) requireActivity();
-        ApiCallback<PageResult<LibraryItem>> callback = new ApiCallback<>() {
+        activity.getRepository().getFavorites("", page, 10, new ApiCallback<>() {
             @Override
             public void onSuccess(PageResult<LibraryItem> data) {
-                items.addAll(data.items);
+                allItems.addAll(data.items);
                 page = data.page + 1;
                 lastPage = data.page + 1 >= data.totalPages;
+                rebuildMapFilters(activity);
                 renderItems(activity.getImageLoader());
-                setLoading(false, items.isEmpty() ? "当前还没有内容" : "");
+                finishRefreshing();
+                setLoading(false, allItems.isEmpty() ? "\u5f53\u524d\u8fd8\u6ca1\u6709\u6536\u85cf\u5e16\u5b50" : "");
             }
 
             @Override
             public void onError(ApiException exception) {
                 renderItems(activity.getImageLoader());
-                setLoading(false, "加载失败：" + exception.getMessage());
+                finishRefreshing();
+                setLoading(false, "\u52a0\u8f7d\u5931\u8d25\uff1a" + exception.getMessage());
             }
-        };
-        activity.getRepository().getFavorites("", page, 10, callback);
+        });
+    }
+
+    private void rebuildMapFilters(MainActivity activity) {
+        if (mapFilterLayout == null) {
+            return;
+        }
+        mapFilterLayout.removeAllViews();
+        mapFilterLayout.addView(mapChip(activity, "\u5168\u90e8", ""));
+
+        Set<String> maps = new TreeSet<>();
+        for (LibraryItem item : allItems) {
+            if (!TextUtils.isEmpty(item.mapName)) {
+                maps.add(item.mapName.trim());
+            }
+        }
+        if (!TextUtils.isEmpty(selectedMap) && !maps.contains(selectedMap)) {
+            selectedMap = "";
+        }
+        for (String map : maps) {
+            Chip chip = mapChip(activity, map, map);
+            KinUi.margins(chip, activity, 8, 0, 0, 0);
+            mapFilterLayout.addView(chip);
+        }
+    }
+
+    private Chip mapChip(MainActivity activity, String label, String value) {
+        Chip chip = KinUi.chip(activity, label);
+        chip.setCheckable(true);
+        chip.setChecked(TextUtils.equals(selectedMap, value));
+        chip.setOnClickListener(v -> {
+            selectedMap = value;
+            rebuildMapFilters(activity);
+            renderItems(activity.getImageLoader());
+            setLoading(false, filteredItems().isEmpty() ? "\u6ca1\u6709\u5339\u914d\u7684\u6536\u85cf\u5e16\u5b50" : "");
+        });
+        return chip;
+    }
+
+    private void showSearchDialog() {
+        MainActivity activity = (MainActivity) requireActivity();
+        LinearLayout root = KinUi.vertical(activity);
+        TextInputLayout keywordLayout = KinUi.inputLayout(activity, "\u641c\u7d22\u6807\u9898 / \u5730\u56fe / \u70b9\u4f4d / \u63cf\u8ff0", false);
+        TextInputEditText keywordEdit = KinUi.edit(keywordLayout);
+        keywordEdit.setText(searchQuery);
+        root.addView(keywordLayout);
+        View historyView = buildSearchHistoryView(activity, keywordEdit);
+        if (historyView != null) {
+            root.addView(historyView);
+            KinUi.margins(historyView, activity, 0, 8, 0, 0);
+        }
+
+        new AlertDialog.Builder(activity)
+                .setTitle("\u641c\u7d22\u6536\u85cf\u5e93")
+                .setView(root)
+                .setPositiveButton("\u641c\u7d22", (dialog, which) -> {
+                    searchQuery = stringValue(keywordEdit);
+                    rememberSearchTerm(searchQuery);
+                    renderItems(activity.getImageLoader());
+                    setLoading(false, filteredItems().isEmpty() ? "\u6ca1\u6709\u5339\u914d\u7684\u6536\u85cf\u5e16\u5b50" : "");
+                })
+                .setNeutralButton("\u6e05\u7a7a", (dialog, which) -> {
+                    searchQuery = "";
+                    renderItems(activity.getImageLoader());
+                    setLoading(false, allItems.isEmpty() ? "\u5f53\u524d\u8fd8\u6ca1\u6709\u6536\u85cf\u5e16\u5b50" : "");
+                })
+                .setNegativeButton("\u53d6\u6d88", null)
+                .show();
+    }
+
+    private View buildSearchHistoryView(MainActivity activity, TextInputEditText target) {
+        List<String> history = searchHistory(activity);
+        if (history.isEmpty()) {
+            return null;
+        }
+        HorizontalScrollView scrollView = new HorizontalScrollView(activity);
+        scrollView.setHorizontalScrollBarEnabled(false);
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        scrollView.addView(row);
+        for (String term : history) {
+            Chip chip = KinUi.chip(activity, term);
+            chip.setOnClickListener(v -> target.setText(term));
+            row.addView(chip);
+            KinUi.margins(chip, activity, 0, 0, 8, 0);
+        }
+        return scrollView;
+    }
+
+    private void rememberSearchTerm(String term) {
+        if (TextUtils.isEmpty(term)) {
+            return;
+        }
+        MainActivity activity = (MainActivity) requireActivity();
+        List<String> history = searchHistory(activity);
+        String normalized = term.trim();
+        history.removeIf(item -> TextUtils.equals(item, normalized));
+        history.add(0, normalized);
+        while (history.size() > MAX_SEARCH_HISTORY) {
+            history.remove(history.size() - 1);
+        }
+        activity.getSharedPreferences(SEARCH_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(SEARCH_HISTORY_KEY, TextUtils.join("\n", history))
+                .apply();
+    }
+
+    private List<String> searchHistory(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(SEARCH_PREFS, Context.MODE_PRIVATE);
+        String raw = prefs.getString(SEARCH_HISTORY_KEY, "");
+        List<String> history = new ArrayList<>();
+        if (TextUtils.isEmpty(raw)) {
+            return history;
+        }
+        for (String term : raw.split("\n")) {
+            if (!TextUtils.isEmpty(term)) {
+                history.add(term);
+            }
+        }
+        return history;
     }
 
     private void renderItems(RemoteImageLoader imageLoader) {
         listContainer.removeAllViews();
         MainActivity activity = (MainActivity) requireActivity();
-        for (LibraryItem item : items) {
+        List<LibraryItem> displayItems = filteredItems();
+        if (displayItems.isEmpty() && !allItems.isEmpty()) {
+            TextView empty = KinUi.muted(activity, "\u6ca1\u6709\u5339\u914d\u7684\u6536\u85cf\u5e16\u5b50", 14);
+            listContainer.addView(empty);
+        }
+        for (LibraryItem item : displayItems) {
             MaterialCardView card = KinUi.card(activity);
             if (item.forumPostId > 0) {
                 card.setClickable(true);
@@ -165,20 +248,21 @@ public class LibraryFragment extends BasePageFragment {
                 card.setOnClickListener(v -> activity.openPostDetail(item.forumPostId, false));
             }
             LinearLayout body = KinUi.sectionContainer(activity, 16);
-            TextView title = KinUi.text(activity, item.title, 18, true);
-            TextView subtitle = KinUi.muted(activity, item.mapName + " · " + translate(item.postType), 13);
+            TextView title = KinUi.text(activity, safeText(item.title, "\u672a\u547d\u540d\u6536\u85cf"), 18, true);
+            TextView subtitle = KinUi.muted(activity, buildSubtitle(item), 13);
             body.addView(title);
             KinUi.margins(subtitle, activity, 0, 8, 0, 0);
             body.addView(subtitle);
-            if (!TextUtils.isEmpty(item.throwMethod)) {
-                TextView desc = KinUi.muted(activity, item.throwMethod, 14);
-                KinUi.margins(desc, activity, 0, 10, 0, 0);
-                body.addView(desc);
-            } else if (!TextUtils.isEmpty(item.tacticDescription)) {
-                TextView desc = KinUi.muted(activity, item.tacticDescription, 14);
+
+            String descText = description(item);
+            if (!TextUtils.isEmpty(descText)) {
+                TextView desc = KinUi.muted(activity, descText, 14);
+                desc.setMaxLines(3);
+                desc.setEllipsize(TextUtils.TruncateAt.END);
                 KinUi.margins(desc, activity, 0, 10, 0, 0);
                 body.addView(desc);
             }
+
             List<String> images = preview(item);
             if (!images.isEmpty()) {
                 View strip = KinUi.imageStrip(activity, images, imageLoader);
@@ -191,76 +275,62 @@ public class LibraryFragment extends BasePageFragment {
         loadMoreButton.setVisibility(lastPage ? View.GONE : View.VISIBLE);
     }
 
-    private void showCreateDialog() {
-        MainActivity activity = (MainActivity) requireActivity();
-        LinearLayout root = KinUi.vertical(activity);
-        TextInputLayout typeLayout = KinUi.inputLayout(activity, "类型（道具/战术）", false);
-        TextInputLayout mapLayout = KinUi.inputLayout(activity, "地图名", false);
-        TextInputLayout titleLayout = KinUi.inputLayout(activity, "标题/名称", false);
-        TextInputLayout descLayout = KinUi.inputLayout(activity, "描述", true);
-        root.addView(typeLayout);
-        root.addView(mapLayout);
-        root.addView(titleLayout);
-        root.addView(descLayout);
-        KinUi.margins(mapLayout, activity, 0, 10, 0, 0);
-        KinUi.margins(titleLayout, activity, 0, 10, 0, 0);
-        KinUi.margins(descLayout, activity, 0, 10, 0, 0);
+    private List<LibraryItem> filteredItems() {
+        List<LibraryItem> result = new ArrayList<>();
+        for (LibraryItem item : allItems) {
+            if (!TextUtils.isEmpty(selectedMap) && !TextUtils.equals(selectedMap, item.mapName)) {
+                continue;
+            }
+            if (!matchesSearch(item)) {
+                continue;
+            }
+            result.add(item);
+        }
+        return result;
+    }
 
-        TextInputEditText typeEdit = KinUi.edit(typeLayout);
-        TextInputEditText mapEdit = KinUi.edit(mapLayout);
-        TextInputEditText titleEdit = KinUi.edit(titleLayout);
-        TextInputEditText descEdit = KinUi.edit(descLayout);
-        typeEdit.setText("道具");
+    private boolean matchesSearch(LibraryItem item) {
+        if (TextUtils.isEmpty(searchQuery)) {
+            return true;
+        }
+        String query = searchQuery.toLowerCase(Locale.ROOT);
+        return contains(item.title, query)
+                || contains(item.mapName, query)
+                || contains(item.propName, query)
+                || contains(item.toolType, query)
+                || contains(item.throwMethod, query)
+                || contains(item.propPosition, query)
+                || contains(item.tacticName, query)
+                || contains(item.tacticType, query)
+                || contains(item.tacticDescription, query)
+                || contains(item.content, query)
+                || contains(item.createdByUsername, query);
+    }
 
-        new AlertDialog.Builder(activity)
-                .setTitle("新建个人条目")
-                .setView(root)
-                .setPositiveButton("保存", (dialog, which) -> {
-                    try {
-                        JSONObject payload = new JSONObject();
-                        String type = normalizeLibraryType(stringValue(typeEdit));
-                        payload.put("postType", type);
-                        payload.put("mapName", stringValue(mapEdit));
-                        if ("TACTIC_SHARE".equals(type)) {
-                            payload.put("tacticName", stringValue(titleEdit));
-                            payload.put("tacticType", "默认战术");
-                            payload.put("tacticDescription", stringValue(descEdit));
-                            payload.put("member1", "成员1");
-                            payload.put("member1Role", "默认");
-                            payload.put("member2", "成员2");
-                            payload.put("member2Role", "默认");
-                            payload.put("member3", "成员3");
-                            payload.put("member3Role", "默认");
-                            payload.put("member4", "成员4");
-                            payload.put("member4Role", "默认");
-                            payload.put("member5", "成员5");
-                            payload.put("member5Role", "默认");
-                        } else {
-                            payload.put("postType", "PROP_SHARE");
-                            payload.put("propName", stringValue(titleEdit));
-                            payload.put("toolType", "SMOKE_GRENADE");
-                            payload.put("throwMethod", stringValue(descEdit));
-                            payload.put("propPosition", "自定义点位");
-                            payload.put("stanceImageUrl", "");
-                            payload.put("aimImageUrl", "");
-                            payload.put("landingImageUrl", "");
-                        }
-                        activity.getRepository().createLibraryItem(payload, new ApiCallback<>() {
-                            @Override
-                            public void onSuccess(LibraryItem data) {
-                                loadData(true);
-                            }
+    private boolean contains(String value, String query) {
+        return !TextUtils.isEmpty(value) && value.toLowerCase(Locale.ROOT).contains(query);
+    }
 
-                            @Override
-                            public void onError(ApiException exception) {
-                                setLoading(false, "创建失败：" + exception.getMessage());
-                            }
-                        });
-                    } catch (Exception ignored) {
-                    }
-                })
-                .setNegativeButton("取消", null)
-                .show();
+    private String buildSubtitle(LibraryItem item) {
+        List<String> parts = new ArrayList<>();
+        if (!TextUtils.isEmpty(item.mapName)) {
+            parts.add(item.mapName);
+        }
+        parts.add(translate(item.postType));
+        if (!TextUtils.isEmpty(item.propPosition)) {
+            parts.add(item.propPosition);
+        }
+        return TextUtils.join(" \u00b7 ", parts);
+    }
+
+    private String description(LibraryItem item) {
+        if (!TextUtils.isEmpty(item.throwMethod)) {
+            return item.throwMethod;
+        }
+        if (!TextUtils.isEmpty(item.tacticDescription)) {
+            return item.tacticDescription;
+        }
+        return item.content;
     }
 
     private List<String> preview(LibraryItem item) {
@@ -282,23 +352,19 @@ public class LibraryFragment extends BasePageFragment {
 
     private String translate(String postType) {
         if ("TACTIC_SHARE".equals(postType)) {
-            return "战术";
+            return "\u6218\u672f";
         }
-        return "道具";
+        if ("DAILY_CHAT".equals(postType)) {
+            return "\u65e5\u5e38";
+        }
+        return "\u9053\u5177";
     }
 
     private String stringValue(TextInputEditText editText) {
         return String.valueOf(editText.getText()).trim();
     }
 
-    private String normalizeLibraryType(String rawType) {
-        if (TextUtils.isEmpty(rawType)) {
-            return "PROP_SHARE";
-        }
-        String type = rawType.trim();
-        if ("TACTIC_SHARE".equalsIgnoreCase(type) || type.contains("战术")) {
-            return "TACTIC_SHARE";
-        }
-        return "PROP_SHARE";
+    private String safeText(String value, String fallback) {
+        return TextUtils.isEmpty(value) ? fallback : value;
     }
 }

@@ -2,6 +2,11 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
+        android:id="@+id/action_page_search"
+        android:icon="@android:drawable/ic_menu_search"
+        android:title="&#x641C;&#x7D22;"
+        app:showAsAction="ifRoom" />
+    <item
         android:id="@+id/action_ai_settings"
         android:icon="@android:drawable/ic_menu_manage"
         android:title="AI &#x8BBE;&#x7F6E;"

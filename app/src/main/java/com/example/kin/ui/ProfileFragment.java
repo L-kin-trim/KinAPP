@@ -39,6 +39,7 @@ public class ProfileFragment extends BasePageFragment {
         SessionUser user = sessionManager.getUser();
 
         contentLayout.addView(profileCard(activity, sessionManager, user));
+        contentLayout.addView(updateCard(activity));
         contentLayout.addView(actionsCard(activity, sessionManager, user));
         setLoading(false, "");
     }
@@ -55,6 +56,19 @@ public class ProfileFragment extends BasePageFragment {
         TextView endpoint = KinUi.muted(activity, "\u670d\u52a1\u5730\u5740: " + sessionManager.getBaseUrl(), 13);
         KinUi.margins(endpoint, activity, 0, 12, 0, 0);
         body.addView(endpoint);
+        card.addView(body);
+        return card;
+    }
+
+    private View updateCard(MainActivity activity) {
+        MaterialCardView card = KinUi.card(activity);
+        LinearLayout body = KinUi.sectionContainer(activity, 18);
+        body.addView(KinUi.text(activity, "\u5e94\u7528\u66f4\u65b0", 19, true));
+        TextView version = KinUi.muted(activity, "\u5f53\u524d\u7248\u672c\uff1a" + activity.getCurrentVersionName(), 14);
+        KinUi.margins(version, activity, 0, 8, 0, 0);
+        body.addView(version);
+        View checkButton = actionButton(activity, "\u624b\u52a8\u68c0\u67e5\u66f4\u65b0", v -> activity.checkForUpdatesManually());
+        body.addView(checkButton);
         card.addView(body);
         return card;
     }

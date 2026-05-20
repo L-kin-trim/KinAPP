@@ -86,7 +86,12 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
         topBar.setTitle("Kin");
         topBar.inflateMenu(R.menu.menu_main_top);
         updateFutureMenuVisibility();
+        updatePageSearchMenuVisibility(0);
         topBar.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == R.id.action_page_search) {
+                openCurrentPageSearch();
+                return true;
+            }
             if (item.getItemId() == R.id.action_ai_settings) {
                 openAiSettings();
                 return true;
@@ -165,6 +170,26 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
         item.setVisible(user != null && user.isAdmin());
     }
 
+    private void updatePageSearchMenuVisibility(int position) {
+        if (topBar == null) {
+            return;
+        }
+        MenuItem searchItem = topBar.getMenu().findItem(R.id.action_page_search);
+        if (searchItem != null) {
+            searchItem.setVisible(position == 0 || position == 1);
+        }
+    }
+
+    private void openCurrentPageSearch() {
+        int position = viewPager.getCurrentItem();
+        Fragment fragment = rootFragments.get(position);
+        if (fragment instanceof HomeFragment) {
+            ((HomeFragment) fragment).openSearch();
+        } else if (fragment instanceof LibraryFragment) {
+            ((LibraryFragment) fragment).openSearch();
+        }
+    }
+
     public void openPostDetail(long postId, boolean mine) {
         Intent intent = new Intent(this, PostDetailActivity.class);
         intent.putExtra(PostDetailActivity.EXTRA_POST_ID, postId);
@@ -188,6 +213,14 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
         startActivity(new Intent(this, FutureFeatureCenterActivity.class));
     }
 
+    public String getCurrentVersionName() {
+        return releaseUpdater.currentVersionName();
+    }
+
+    public void checkForUpdatesManually() {
+        releaseUpdater.checkForUpdates(true);
+    }
+
     public void switchToPublish() {
         viewPager.setCurrentItem(2, false);
     }
@@ -209,9 +242,10 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
     }
 
     private void updateToolbarForPage(int position) {
-        String[] titles = {"\u9996\u9875", "\u8d44\u6599\u5e93", "\u53d1\u5e16", "AI\u63a8\u8350", "\u6211"};
+        String[] titles = {"\u9996\u9875", "\u6536\u85cf\u5e93", "\u53d1\u5e16", "AI\u63a8\u8350", "\u6211"};
         setTopBar(titles[position], "");
         refreshToolbarSubtitle();
+        updatePageSearchMenuVisibility(position);
     }
 
     private void ensureSessionAlive() {

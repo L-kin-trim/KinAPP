@@ -1,9 +1,13 @@
 package com.example.kin.ui;
 
 import android.graphics.drawable.GradientDrawable;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.CheckBox;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -33,6 +37,10 @@ import java.util.List;
 import java.util.Locale;
 
 public class HomeFragment extends BasePageFragment {
+    private static final String SEARCH_PREFS = "home_search_history";
+    private static final String SEARCH_HISTORY_KEY = "terms";
+    private static final int MAX_SEARCH_HISTORY = 8;
+
     private final List<ForumPostModel> posts = new ArrayList<>();
     private LinearLayout listContainer;
     private LinearLayout hotKeywordLayout;
@@ -42,6 +50,7 @@ public class HomeFragment extends BasePageFragment {
     private String mapName = "";
     private String author = "";
     private String sortType = "LATEST";
+    private boolean exactSearch = false;
     private int currentPage = 0;
     private boolean lastPage = false;
 
@@ -60,6 +69,15 @@ public class HomeFragment extends BasePageFragment {
         loadMoreButton.setOnClickListener(v -> loadPosts(false));
         contentLayout.addView(loadMoreButton);
         loadPosts(true);
+    }
+
+    @Override
+    protected void onRefreshRequested() {
+        loadPosts(true);
+    }
+
+    public void openSearch() {
+        showSearchDialog();
     }
 
     private View buildFutureCard(MainActivity activity) {
@@ -201,12 +219,24 @@ public class HomeFragment extends BasePageFragment {
         keywordEdit.setText(keyword);
         mapEdit.setText(mapName);
         authorEdit.setText(author);
+        CheckBox exactCheck = new CheckBox(activity);
+        exactCheck.setText("\u7cbe\u786e\u641c\u7d22");
+        exactCheck.setChecked(exactSearch);
 
         root.addView(keywordLayout);
+        View historyView = buildSearchHistoryView(activity, keywordEdit);
+        if (historyView != null) {
+            root.addView(historyView);
+        }
         root.addView(mapLayout);
         root.addView(authorLayout);
+        root.addView(exactCheck);
+        if (historyView != null) {
+            KinUi.margins(historyView, activity, 0, 8, 0, 0);
+        }
         KinUi.margins(mapLayout, activity, 0, 10, 0, 0);
         KinUi.margins(authorLayout, activity, 0, 10, 0, 0);
+        KinUi.margins(exactCheck, activity, 0, 8, 0, 0);
 
         new AlertDialog.Builder(activity)
                 .setTitle("搜索帖子")
@@ -215,16 +245,71 @@ public class HomeFragment extends BasePageFragment {
                     keyword = stringValue(keywordEdit);
                     mapName = stringValue(mapEdit);
                     author = stringValue(authorEdit);
+                    exactSearch = exactCheck.isChecked();
+                    rememberSearchTerm(TextUtils.isEmpty(keyword) ? mapName : keyword);
                     loadPosts(true);
                 })
                 .setNeutralButton("清空", (dialog, which) -> {
                     keyword = "";
                     mapName = "";
                     author = "";
+                    exactSearch = false;
                     loadPosts(true);
                 })
                 .setNegativeButton("取消", null)
                 .show();
+    }
+
+    private View buildSearchHistoryView(MainActivity activity, TextInputEditText target) {
+        List<String> history = searchHistory(activity);
+        if (history.isEmpty()) {
+            return null;
+        }
+        HorizontalScrollView scrollView = new HorizontalScrollView(activity);
+        scrollView.setHorizontalScrollBarEnabled(false);
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        scrollView.addView(row);
+        for (String term : history) {
+            Chip chip = KinUi.chip(activity, term);
+            chip.setOnClickListener(v -> target.setText(term));
+            row.addView(chip);
+            KinUi.margins(chip, activity, 0, 0, 8, 0);
+        }
+        return scrollView;
+    }
+
+    private void rememberSearchTerm(String term) {
+        if (TextUtils.isEmpty(term)) {
+            return;
+        }
+        MainActivity activity = (MainActivity) requireActivity();
+        List<String> history = searchHistory(activity);
+        String normalized = term.trim();
+        history.removeIf(item -> TextUtils.equals(item, normalized));
+        history.add(0, normalized);
+        while (history.size() > MAX_SEARCH_HISTORY) {
+            history.remove(history.size() - 1);
+        }
+        activity.getSharedPreferences(SEARCH_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(SEARCH_HISTORY_KEY, TextUtils.join("\n", history))
+                .apply();
+    }
+
+    private List<String> searchHistory(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(SEARCH_PREFS, Context.MODE_PRIVATE);
+        String raw = prefs.getString(SEARCH_HISTORY_KEY, "");
+        List<String> history = new ArrayList<>();
+        if (TextUtils.isEmpty(raw)) {
+            return history;
+        }
+        for (String term : raw.split("\n")) {
+            if (!TextUtils.isEmpty(term)) {
+                history.add(term);
+            }
+        }
+        return history;
     }
 
     private void loadPosts(boolean reset) {
@@ -238,16 +323,18 @@ public class HomeFragment extends BasePageFragment {
         ApiCallback<PageResult<ForumPostModel>> callback = new ApiCallback<>() {
             @Override
             public void onSuccess(PageResult<ForumPostModel> data) {
-                posts.addAll(data.items);
+                posts.addAll(exactSearch ? exactFiltered(data.items) : data.items);
                 currentPage = data.page + 1;
                 lastPage = data.page + 1 >= data.totalPages;
                 renderPosts(activity.getImageLoader());
+                finishRefreshing();
                 setLoading(false, data.items.isEmpty() && posts.isEmpty() ? "还没有可展示的帖子。" : "");
             }
 
             @Override
             public void onError(ApiException exception) {
                 renderPosts(activity.getImageLoader());
+                finishRefreshing();
                 setLoading(false, "帖子加载失败：" + exception.getMessage());
             }
         };
@@ -258,6 +345,49 @@ public class HomeFragment extends BasePageFragment {
         } else {
             activity.getRepository().getPosts(currentType, currentPage, 10, sortType, "", "", callback);
         }
+    }
+
+    private List<ForumPostModel> exactFiltered(List<ForumPostModel> source) {
+        if (!exactSearch) {
+            return source;
+        }
+        List<ForumPostModel> result = new ArrayList<>();
+        for (ForumPostModel post : source) {
+            if (matchesExact(post)) {
+                result.add(post);
+            }
+        }
+        return result;
+    }
+
+    private boolean matchesExact(ForumPostModel post) {
+        return exactMatch(keyword,
+                post.title,
+                post.mapName,
+                post.propName,
+                post.toolType,
+                translateToolType(post.toolType),
+                post.throwMethod,
+                post.propPosition,
+                post.tacticName,
+                post.tacticType,
+                post.tacticDescription,
+                post.content)
+                && exactMatch(mapName, post.mapName)
+                && exactMatch(author, post.createdByUsername);
+    }
+
+    private boolean exactMatch(String query, String... values) {
+        if (TextUtils.isEmpty(query)) {
+            return true;
+        }
+        String normalizedQuery = query.trim().toLowerCase(Locale.ROOT);
+        for (String value : values) {
+            if (!TextUtils.isEmpty(value) && normalizedQuery.equals(value.trim().toLowerCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void renderPosts(RemoteImageLoader imageLoader) {

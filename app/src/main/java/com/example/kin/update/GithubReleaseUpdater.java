@@ -48,7 +48,11 @@ public class GithubReleaseUpdater {
     }
 
     public void checkForUpdates() {
-        if (checkInFlight || checkCompleted || dialogShown) {
+        checkForUpdates(false);
+    }
+
+    public void checkForUpdates(boolean manual) {
+        if (checkInFlight || (!manual && (checkCompleted || dialogShown))) {
             return;
         }
         checkInFlight = true;
@@ -57,15 +61,25 @@ public class GithubReleaseUpdater {
                 ReleaseInfo release = fetchLatestRelease();
                 checkInFlight = false;
                 checkCompleted = true;
-                if (release == null || !release.isNewerThan(localVersionName())) {
+                if (release == null || !release.isNewerThan(currentVersionName())) {
+                    if (manual) {
+                        AppExecutors.main(() -> showNoUpdateDialog(release));
+                    }
                     return;
                 }
                 AppExecutors.main(() -> showUpdateDialog(release));
-            } catch (Exception ignored) {
+            } catch (Exception exception) {
                 checkInFlight = false;
                 checkCompleted = true;
+                if (manual) {
+                    AppExecutors.main(() -> showManualCheckFailedDialog(exception));
+                }
             }
         });
+    }
+
+    public String currentVersionName() {
+        return localVersionName();
     }
 
     private ReleaseInfo fetchLatestRelease() throws Exception {
@@ -100,6 +114,29 @@ public class GithubReleaseUpdater {
             dialog.dismiss();
             downloadAndInstall(release);
         });
+    }
+
+    private void showNoUpdateDialog(ReleaseInfo release) {
+        if (activity.isFinishing() || activity.isDestroyed()) {
+            return;
+        }
+        String latest = release == null ? "\u672a\u627e\u5230\u53ef\u7528 APK \u53d1\u884c\u7248" : release.displayName();
+        new AlertDialog.Builder(activity)
+                .setTitle("\u5df2\u662f\u6700\u65b0\u7248\u672c")
+                .setMessage("\u5f53\u524d\u7248\u672c\uff1a" + currentVersionName() + "\n\u6700\u65b0\u7248\u672c\uff1a" + latest)
+                .setPositiveButton("\u77e5\u9053\u4e86", null)
+                .show();
+    }
+
+    private void showManualCheckFailedDialog(Exception exception) {
+        if (activity.isFinishing() || activity.isDestroyed()) {
+            return;
+        }
+        new AlertDialog.Builder(activity)
+                .setTitle("\u68c0\u67e5\u66f4\u65b0\u5931\u8d25")
+                .setMessage(TextUtils.isEmpty(exception.getMessage()) ? "\u65e0\u6cd5\u8fde\u63a5 GitHub \u53d1\u884c\u7248\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002" : exception.getMessage())
+                .setPositiveButton("\u77e5\u9053\u4e86", null)
+                .show();
     }
 
     private void downloadAndInstall(ReleaseInfo release) {
