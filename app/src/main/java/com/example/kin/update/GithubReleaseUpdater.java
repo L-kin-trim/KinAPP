@@ -28,6 +28,9 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 
 public class GithubReleaseUpdater {
@@ -84,8 +87,15 @@ public class GithubReleaseUpdater {
 
     private ReleaseInfo fetchLatestRelease() throws Exception {
         HttpURLConnection connection = openConnection(RELEASES_API);
-        String body = readText(connection.getInputStream());
+        int status = connection.getResponseCode();
+        String body = readText(status >= 200 && status < 300
+                ? connection.getInputStream()
+                : connection.getErrorStream());
+        if (status < 200 || status >= 300) {
+            throw new IllegalStateException("GitHub 更新检查失败：HTTP " + status + "\n" + body);
+        }
         JSONArray releases = new JSONArray(body);
+        List<ReleaseInfo> candidates = new ArrayList<>();
         for (int i = 0; i < releases.length(); i++) {
             JSONObject item = releases.getJSONObject(i);
             if (item.optBoolean("draft")) {
@@ -93,10 +103,12 @@ public class GithubReleaseUpdater {
             }
             ReleaseInfo release = ReleaseInfo.fromJson(item);
             if (!TextUtils.isEmpty(release.apkUrl)) {
-                return release;
+                candidates.add(release);
             }
         }
-        return null;
+        return candidates.stream()
+                .max(Comparator.comparingInt(ReleaseInfo::versionCode))
+                .orElse(null);
     }
 
     private void showUpdateDialog(ReleaseInfo release) {
@@ -304,6 +316,9 @@ public class GithubReleaseUpdater {
     }
 
     private String readText(InputStream inputStream) throws Exception {
+        if (inputStream == null) {
+            return "";
+        }
         try (InputStream in = inputStream; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[8192];
             int length;
@@ -362,7 +377,13 @@ public class GithubReleaseUpdater {
         }
 
         boolean isNewerThan(String localVersionName) {
-            return normalizedVersion(displayName()) > normalizedVersion(localVersionName);
+            return versionCode() > normalizedVersion(localVersionName);
+        }
+
+        int versionCode() {
+            int tagVersion = normalizedVersion(tagName);
+            int nameVersion = normalizedVersion(name);
+            return Math.max(tagVersion, nameVersion);
         }
 
         String safeVersionName() {
