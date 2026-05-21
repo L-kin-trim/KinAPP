@@ -77,7 +77,9 @@ public class HomeFragment extends BasePageFragment {
     }
 
     public void openSearch() {
-        showSearchDialog();
+        android.content.Intent intent = new android.content.Intent(requireContext(), SearchActivity.class);
+        intent.putExtra(SearchActivity.EXTRA_MODE, SearchActivity.MODE_HOME);
+        startActivity(intent);
     }
 
     private View buildFutureCard(MainActivity activity) {

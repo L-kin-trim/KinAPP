@@ -22,6 +22,7 @@
         <activity android:name=".ui.AiSettingsActivity" />
         <activity android:name=".ui.admin.AdminCenterActivity" />
         <activity android:name=".ui.MessagesActivity" />
+        <activity android:name=".ui.SearchActivity" />
         <activity android:name=".ui.ImagePreviewActivity" />
         <activity android:name=".ui.PostDetailActivity" />
         <activity android:name=".ui.PublishEditorActivity" />

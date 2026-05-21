@@ -81,7 +81,9 @@ public class LibraryFragment extends BasePageFragment {
     }
 
     public void openSearch() {
-        showSearchDialog();
+        android.content.Intent intent = new android.content.Intent(requireContext(), SearchActivity.class);
+        intent.putExtra(SearchActivity.EXTRA_MODE, SearchActivity.MODE_LIBRARY);
+        startActivity(intent);
     }
 
     private void loadData(boolean reset) {

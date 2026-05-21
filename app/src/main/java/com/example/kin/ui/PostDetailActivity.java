@@ -1,11 +1,15 @@
 package com.example.kin.ui;
 
 import android.content.Intent;
-import android.net.Uri;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -13,8 +17,6 @@ import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -22,16 +24,12 @@ import com.example.kin.R;
 import com.example.kin.data.KinRepository;
 import com.example.kin.model.ForumCommentModel;
 import com.example.kin.model.ForumPostModel;
-import com.example.kin.model.ImageUploadItem;
 import com.example.kin.model.LikeStatusModel;
 import com.example.kin.net.ApiCallback;
 import com.example.kin.net.ApiException;
 import com.example.kin.ui.common.KinUi;
 import com.example.kin.ui.common.RemoteImageLoader;
-import com.example.kin.ui.future.FutureFeatureDetailActivity;
-import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
@@ -51,30 +49,24 @@ public class PostDetailActivity extends AppCompatActivity {
     private long postId;
     private boolean mine;
     private ForumPostModel currentPost;
-    private LinearLayout contentLayout;
+    private LinearLayout bodyLayout;
     private LinearLayout commentsLayout;
+    private ScrollView bodyScroll;
+    private ScrollView commentsScroll;
     private ProgressBar progressBar;
     private TextView statusView;
-    private TextView commentImageState;
-    private TextView replyHintView;
     private TextInputEditText commentEdit;
+    private TextView replyHintView;
+    private TextView bodyTab;
+    private TextView commentsTab;
     private ImageView likeActionIcon;
     private TextView likeActionLabel;
     private ImageView favoriteActionIcon;
     private TextView favoriteActionLabel;
+    private TextView commentActionLabel;
     private boolean postFavorited;
     private long replyTargetCommentId;
-    private final List<Uri> commentImageUris = new ArrayList<>();
-
-    private final ActivityResultLauncher<String> commentImagePicker = registerForActivityResult(
-            new ActivityResultContracts.GetMultipleContents(),
-            uris -> {
-                commentImageUris.clear();
-                commentImageUris.addAll(uris);
-                if (commentImageState != null) {
-                    commentImageState.setText("评论图片：" + commentImageUris.size() + " 张");
-                }
-            });
+    private int commentCount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -84,32 +76,161 @@ public class PostDetailActivity extends AppCompatActivity {
         postId = getIntent().getLongExtra(EXTRA_POST_ID, 0L);
         mine = getIntent().getBooleanExtra(EXTRA_MINE, false);
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout root = KinUi.vertical(this);
         root.setBackgroundColor(getColor(KinUi.isNight(this) ? R.color.kin_dark_bg : R.color.kin_light_bg));
+        root.addView(buildTopBar());
+        root.addView(buildStatusRow());
 
-        MaterialToolbar toolbar = new MaterialToolbar(this);
-        toolbar.setTitle("帖子详情");
-        toolbar.setNavigationIcon(android.R.drawable.ic_menu_revert);
-        toolbar.setNavigationOnClickListener(v -> finish());
-        root.addView(toolbar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        FrameLayout contentFrame = new FrameLayout(this);
+        bodyScroll = new ScrollView(this);
+        bodyLayout = KinUi.vertical(this);
+        bodyLayout.setPadding(0, 0, 0, KinUi.dp(this, 18));
+        bodyScroll.addView(bodyLayout);
+        contentFrame.addView(bodyScroll, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
 
-        ScrollView scrollView = new ScrollView(this);
-        contentLayout = KinUi.vertical(this);
-        contentLayout.setPadding(KinUi.dp(this, 8), KinUi.dp(this, 12), KinUi.dp(this, 8), KinUi.dp(this, 24));
-        progressBar = new ProgressBar(this);
-        statusView = KinUi.muted(this, "", 13);
-        statusView.setVisibility(View.GONE);
-        contentLayout.addView(progressBar);
-        contentLayout.addView(statusView);
-        scrollView.addView(contentLayout);
-        root.addView(scrollView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        commentsScroll = new ScrollView(this);
+        commentsLayout = KinUi.vertical(this);
+        commentsLayout.setPadding(KinUi.dp(this, 16), KinUi.dp(this, 12), KinUi.dp(this, 16), KinUi.dp(this, 18));
+        commentsScroll.addView(commentsLayout);
+        commentsScroll.setVisibility(View.GONE);
+        contentFrame.addView(commentsScroll, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+
+        root.addView(contentFrame, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        root.addView(buildBottomBar());
         setContentView(root);
+        selectTab(false);
         loadAll();
     }
 
+    private View buildTopBar() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(KinUi.dp(this, 10), KinUi.dp(this, 8), KinUi.dp(this, 10), KinUi.dp(this, 4));
+
+        ImageView back = new ImageView(this);
+        back.setImageResource(android.R.drawable.ic_media_previous);
+        back.setColorFilter(KinUi.color(this, com.google.android.material.R.attr.colorOnSurface));
+        back.setPadding(KinUi.dp(this, 8), KinUi.dp(this, 8), KinUi.dp(this, 8), KinUi.dp(this, 8));
+        back.setOnClickListener(v -> finish());
+        bar.addView(back, new LinearLayout.LayoutParams(KinUi.dp(this, 48), KinUi.dp(this, 48)));
+
+        LinearLayout tabs = new LinearLayout(this);
+        tabs.setOrientation(LinearLayout.HORIZONTAL);
+        tabs.setGravity(Gravity.CENTER);
+        bodyTab = tabText("正文");
+        commentsTab = tabText("评论");
+        bodyTab.setOnClickListener(v -> selectTab(false));
+        commentsTab.setOnClickListener(v -> selectTab(true));
+        tabs.addView(bodyTab);
+        tabs.addView(commentsTab);
+        bar.addView(tabs, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        ImageView report = new ImageView(this);
+        report.setImageResource(android.R.drawable.ic_menu_share);
+        report.setColorFilter(KinUi.color(this, com.google.android.material.R.attr.colorOnSurface));
+        report.setPadding(KinUi.dp(this, 8), KinUi.dp(this, 8), KinUi.dp(this, 8), KinUi.dp(this, 8));
+        report.setOnClickListener(v -> {
+            if (currentPost != null) {
+                showReportDialog("POST", currentPost.id);
+            }
+        });
+        bar.addView(report, new LinearLayout.LayoutParams(KinUi.dp(this, 48), KinUi.dp(this, 48)));
+        return bar;
+    }
+
+    private TextView tabText(String value) {
+        TextView textView = KinUi.text(this, value, 17, true);
+        textView.setGravity(Gravity.CENTER);
+        textView.setPadding(KinUi.dp(this, 22), KinUi.dp(this, 8), KinUi.dp(this, 22), KinUi.dp(this, 8));
+        return textView;
+    }
+
+    private View buildStatusRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(KinUi.dp(this, 16), 0, KinUi.dp(this, 16), 0);
+        progressBar = new ProgressBar(this);
+        statusView = KinUi.muted(this, "", 13);
+        statusView.setVisibility(View.GONE);
+        row.addView(progressBar, new LinearLayout.LayoutParams(KinUi.dp(this, 32), KinUi.dp(this, 32)));
+        row.addView(statusView, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        return row;
+    }
+
+    private View buildBottomBar() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(KinUi.dp(this, 14), KinUi.dp(this, 8), KinUi.dp(this, 14), KinUi.dp(this, 8));
+        root.setBackgroundColor(getColor(KinUi.isNight(this) ? R.color.kin_dark_panel : R.color.kin_light_panel));
+
+        replyHintView = KinUi.muted(this, "", 12);
+        replyHintView.setVisibility(View.GONE);
+        root.addView(replyHintView);
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+
+        commentEdit = new TextInputEditText(this);
+        commentEdit.setSingleLine(true);
+        commentEdit.setHint("来说点什么吧!");
+        commentEdit.setTextSize(15);
+        commentEdit.setImeOptions(EditorInfo.IME_ACTION_SEND);
+        commentEdit.setPadding(KinUi.dp(this, 12), 0, KinUi.dp(this, 12), 0);
+        GradientDrawable inputBg = new GradientDrawable();
+        inputBg.setColor(getColor(KinUi.isNight(this) ? R.color.kin_dark_panel_alt : R.color.kin_light_panel_alt));
+        inputBg.setCornerRadius(KinUi.dp(this, 10));
+        commentEdit.setBackground(inputBg);
+        commentEdit.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEND) {
+                submitComment();
+                return true;
+            }
+            return false;
+        });
+        row.addView(commentEdit, new LinearLayout.LayoutParams(0, KinUi.dp(this, 44), 1f));
+
+        likeActionIcon = new ImageView(this);
+        likeActionLabel = KinUi.muted(this, "0", 12);
+        row.addView(bottomIcon(likeActionIcon, likeActionLabel, R.drawable.ic_action_like, v -> toggleLike()));
+
+        favoriteActionIcon = new ImageView(this);
+        favoriteActionLabel = KinUi.muted(this, "收藏", 12);
+        row.addView(bottomIcon(favoriteActionIcon, favoriteActionLabel, R.drawable.ic_action_favorite, v -> toggleFavorite()));
+
+        ImageView commentIcon = new ImageView(this);
+        commentActionLabel = KinUi.muted(this, "0", 12);
+        row.addView(bottomIcon(commentIcon, commentActionLabel, R.drawable.ic_action_comment, v -> {
+            selectTab(true);
+            commentEdit.requestFocus();
+        }));
+
+        root.addView(row);
+        return root;
+    }
+
+    private View bottomIcon(ImageView icon, TextView label, int iconRes, View.OnClickListener listener) {
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER);
+        item.setPadding(KinUi.dp(this, 10), 0, 0, 0);
+        item.setOnClickListener(listener);
+        icon.setImageResource(iconRes);
+        icon.setColorFilter(getColor(R.color.kin_text_muted));
+        item.addView(icon, new LinearLayout.LayoutParams(KinUi.dp(this, 28), KinUi.dp(this, 28)));
+        label.setGravity(Gravity.CENTER);
+        item.addView(label);
+        return item;
+    }
+
     private void loadAll() {
-        setLoading(true, "正在加载帖子…");
+        setLoading(true, "正在加载帖子...");
         repository.getPostDetail(postId, mine, new ApiCallback<>() {
             @Override
             public void onSuccess(ForumPostModel data) {
@@ -130,7 +251,9 @@ public class PostDetailActivity extends AppCompatActivity {
         repository.getComments(postId, new ApiCallback<>() {
             @Override
             public void onSuccess(List<ForumCommentModel> data) {
+                commentCount = data.size();
                 renderComments(data);
+                applyCommentCount();
                 setLoading(false, "");
             }
 
@@ -142,270 +265,197 @@ public class PostDetailActivity extends AppCompatActivity {
     }
 
     private void renderPost() {
-        contentLayout.removeAllViews();
-        contentLayout.addView(progressBar);
-        contentLayout.addView(statusView);
+        bodyLayout.removeAllViews();
+        List<String> images = previewImages();
+        if (!images.isEmpty()) {
+            bodyLayout.addView(buildHeroImages(images));
+        }
 
-        LinearLayout body = KinUi.sectionContainer(this, 8);
-        body.addView(KinUi.text(this, currentPost.title, 22, true));
-        TextView meta = KinUi.muted(this,
-                currentPost.createdByUsername + " · " + currentPost.createdAt,
-                13);
-        KinUi.margins(meta, this, 0, 8, 0, 0);
-        body.addView(meta);
+        LinearLayout body = KinUi.sectionContainer(this, 18);
+        body.addView(buildAuthorRow());
+        TextView title = KinUi.text(this, safeText(currentPost.title, "未命名帖子"), 24, true);
+        KinUi.margins(title, this, 0, 14, 0, 0);
+        body.addView(title);
 
-        TextView summary = KinUi.muted(this, buildSummary(), 15);
+        TextView summary = KinUi.text(this, buildSummary(), 17, false);
+        summary.setLineSpacing(KinUi.dp(this, 4), 1f);
         KinUi.margins(summary, this, 0, 12, 0, 0);
         body.addView(summary);
 
-        List<String> images = previewImages();
-        if (!images.isEmpty()) {
-            View strip = buildPreviewImageStrip(images);
-            KinUi.margins(strip, this, 0, 14, 0, 0);
-            body.addView(strip);
-        }
-
-        View actions = buildPostActionIcons();
-        KinUi.margins(actions, this, 0, 16, 0, 0);
-        body.addView(actions);
+        TextView meta = KinUi.muted(this, buildMeta(), 13);
+        KinUi.margins(meta, this, 0, 18, 0, 0);
+        body.addView(meta);
 
         if (currentPost.canEdit || mine) {
             MaterialButton editButton = KinUi.outlinedButton(this, "更新帖子");
             editButton.setOnClickListener(v -> showEditDialog());
-            KinUi.margins(editButton, this, 0, 12, 0, 0);
+            KinUi.margins(editButton, this, 0, 16, 0, 0);
             body.addView(editButton);
         }
         if (currentPost.canWithdraw || mine) {
             MaterialButton withdrawButton = KinUi.outlinedButton(this, "撤回帖子");
-            withdrawButton.setOnClickListener(v -> repository.withdrawPost(postId, new ApiCallback<>() {
-                @Override
-                public void onSuccess(ForumPostModel data) {
-                    currentPost = data;
-                    renderPost();
-                    loadComments();
-                }
-
-                @Override
-                public void onError(ApiException exception) {
-                    setLoading(false, "撤回失败：" + exception.getMessage());
-                }
-            }));
-            KinUi.margins(withdrawButton, this, 0, 12, 0, 0);
+            withdrawButton.setOnClickListener(v -> withdrawPost());
+            KinUi.margins(withdrawButton, this, 0, 10, 0, 0);
             body.addView(withdrawButton);
         }
 
-        contentLayout.addView(body);
-
-        View divider = KinUi.divider(this);
-        KinUi.margins(divider, this, 0, 18, 0, 18);
-        contentLayout.addView(divider);
-
-        contentLayout.addView(buildCommentComposer());
-
-        commentsLayout = KinUi.vertical(this);
-        KinUi.margins(commentsLayout, this, 0, 18, 0, 0);
-        contentLayout.addView(commentsLayout);
+        bodyLayout.addView(body);
+        applyLikeActionState();
+        applyFavoriteActionState();
     }
 
-    private View buildPostActionIcons() {
+    private View buildAuthorRow() {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(android.view.Gravity.CENTER);
+        row.setGravity(Gravity.CENTER_VERTICAL);
 
-        likeActionIcon = new ImageView(this);
-        likeActionLabel = KinUi.muted(this, "", 12);
-        View likeAction = buildIconAction(likeActionIcon, likeActionLabel, R.drawable.ic_action_like, "点赞");
-        likeAction.setOnClickListener(v -> toggleLike());
-        applyLikeActionState();
+        TextView avatar = KinUi.text(this, avatarText(currentPost.createdByUsername), 16, true);
+        avatar.setGravity(Gravity.CENTER);
+        avatar.setTextColor(getColor(R.color.kin_text_inverse));
+        GradientDrawable avatarBg = new GradientDrawable();
+        avatarBg.setShape(GradientDrawable.OVAL);
+        avatarBg.setColor(getColor(R.color.kin_accent));
+        avatar.setBackground(avatarBg);
+        row.addView(avatar, new LinearLayout.LayoutParams(KinUi.dp(this, 46), KinUi.dp(this, 46)));
 
-        favoriteActionIcon = new ImageView(this);
-        favoriteActionLabel = KinUi.muted(this, "", 12);
-        View favoriteAction = buildIconAction(favoriteActionIcon, favoriteActionLabel, R.drawable.ic_action_favorite, "收藏");
-        favoriteAction.setOnClickListener(v -> toggleFavorite());
-        applyFavoriteActionState();
-
-        ImageView reportIcon = new ImageView(this);
-        TextView reportLabel = KinUi.muted(this, "举报", 12);
-        View reportAction = buildIconAction(reportIcon, reportLabel, R.drawable.ic_action_report, "举报");
-        reportAction.setOnClickListener(v -> showReportDialog("POST", currentPost.id));
-
-        row.addView(likeAction, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        row.addView(favoriteAction, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        row.addView(reportAction, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout info = KinUi.vertical(this);
+        TextView name = KinUi.text(this, safeText(currentPost.createdByUsername, "用户"), 16, true);
+        TextView level = KinUi.muted(this, "Lv." + Math.max(currentPost.authorLevel, 0), 12);
+        info.addView(name);
+        info.addView(level);
+        LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        infoParams.leftMargin = KinUi.dp(this, 12);
+        row.addView(info, infoParams);
         return row;
     }
 
-    private View buildIconAction(ImageView icon, TextView label, int iconResId, String contentDescription) {
-        LinearLayout container = new LinearLayout(this);
-        container.setOrientation(LinearLayout.VERTICAL);
-        container.setGravity(android.view.Gravity.CENTER);
-        container.setClickable(true);
-        container.setFocusable(true);
-        container.setContentDescription(contentDescription);
-        container.setPadding(KinUi.dp(this, 8), KinUi.dp(this, 6), KinUi.dp(this, 8), KinUi.dp(this, 6));
-
-        icon.setImageResource(iconResId);
-        icon.setColorFilter(getColor(R.color.kin_text_muted));
-        container.addView(icon, new LinearLayout.LayoutParams(KinUi.dp(this, 28), KinUi.dp(this, 28)));
-        KinUi.margins(label, this, 0, 4, 0, 0);
-        label.setGravity(android.view.Gravity.CENTER);
-        container.addView(label);
-        return container;
-    }
-
-    private void applyLikeActionState() {
-        if (likeActionIcon == null || likeActionLabel == null || currentPost == null) {
-            return;
-        }
-        likeActionLabel.setText((currentPost.liked ? "已赞 " : "点赞 ") + currentPost.likeCount);
-        likeActionIcon.setColorFilter(getColor(currentPost.liked ? R.color.kin_danger : R.color.kin_text_muted));
-    }
-
-    private void applyFavoriteActionState() {
-        if (favoriteActionIcon == null || favoriteActionLabel == null) {
-            return;
-        }
-        favoriteActionLabel.setText(postFavorited ? "已收藏" : "收藏");
-        favoriteActionIcon.setColorFilter(getColor(postFavorited ? R.color.kin_warning : R.color.kin_text_muted));
-    }
-
-    private View buildPreviewImageStrip(List<String> urls) {
+    private View buildHeroImages(List<String> urls) {
         HorizontalScrollView scrollView = new HorizontalScrollView(this);
         scrollView.setHorizontalScrollBarEnabled(false);
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setPadding(0, KinUi.dp(this, 8), 0, KinUi.dp(this, 8));
         scrollView.addView(row);
+        int width = getResources().getDisplayMetrics().widthPixels;
+        int height = Math.min(KinUi.dp(this, 320), Math.max(KinUi.dp(this, 220), Math.round(width * 0.62f)));
         for (int i = 0; i < urls.size(); i++) {
             String url = urls.get(i);
             if (TextUtils.isEmpty(url)) {
                 continue;
             }
             ImageView imageView = new ImageView(this);
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(KinUi.dp(this, 160), KinUi.dp(this, 112));
-            params.rightMargin = KinUi.dp(this, 10);
-            imageView.setLayoutParams(params);
             imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
             imageView.setBackgroundColor(getColor(KinUi.isNight(this) ? R.color.kin_dark_panel_alt : R.color.kin_light_panel_alt));
-            imageView.setClipToOutline(true);
-            imageView.setClickable(true);
-            imageView.setFocusable(true);
             int index = i;
             imageView.setOnClickListener(v -> openImagePreview(urls, index));
+            row.addView(imageView, new LinearLayout.LayoutParams(width, height));
             imageLoader.load(imageView, url);
-            row.addView(imageView);
         }
         return scrollView;
     }
 
-    private void openImagePreview(List<String> urls, int index) {
-        Intent intent = new Intent(this, ImagePreviewActivity.class);
-        intent.putStringArrayListExtra(ImagePreviewActivity.EXTRA_IMAGE_URLS, new ArrayList<>(urls));
-        intent.putExtra(ImagePreviewActivity.EXTRA_IMAGE_INDEX, index);
-        startActivity(intent);
-    }
-
-    private View buildPostUpgradeCard() {
-        MaterialCardView card = KinUi.card(this);
-        LinearLayout body = KinUi.sectionContainer(this, 18);
-        body.addView(KinUi.text(this, "帖子详情工具", 18, true));
-        body.addView(KinUi.muted(this, "版本历史、阅读进度、相似推荐、投票、分享海报和评论总结集中在详情页使用。", 14));
-        LinearLayout row = KinUi.buttonRow(this,
-                featureButton("版本历史", "content.version_history"),
-                featureButton("相似推荐", "community.similar_content"),
-                featureButton("评论总结", "ai.comment_summary"));
-        KinUi.margins(row, this, 0, 12, 0, 0);
-        body.addView(row);
-        LinearLayout row2 = KinUi.buttonRow(this,
-                featureButton("阅读进度", "community.reading_progress"),
-                featureButton("投票", "community.poll_post"),
-                featureButton("分享海报", "community.share_poster"));
-        KinUi.margins(row2, this, 0, 10, 0, 0);
-        body.addView(row2);
-        card.addView(body);
-        return card;
-    }
-
-    private MaterialButton featureButton(String label, String featureKey) {
-        MaterialButton button = KinUi.outlinedButton(this, label);
-        button.setOnClickListener(v -> {
-            android.content.Intent intent = new android.content.Intent(this, FutureFeatureDetailActivity.class);
-            intent.putExtra(FutureFeatureDetailActivity.EXTRA_FEATURE_KEY, featureKey);
-            startActivity(intent);
-        });
-        return button;
-    }
-
-    private View buildCommentComposer() {
-        LinearLayout body = KinUi.sectionContainer(this, 18);
-        body.addView(KinUi.text(this, "发表评论", 18, true));
-        replyHintView = KinUi.muted(this, "", 13);
-        replyHintView.setVisibility(View.GONE);
-        KinUi.margins(replyHintView, this, 0, 8, 0, 0);
-        body.addView(replyHintView);
-        TextInputLayout commentLayout = KinUi.inputLayout(this, "评论内容，支持 @用户名", true);
-        commentEdit = KinUi.edit(commentLayout);
-        KinUi.margins(commentLayout, this, 0, 12, 0, 0);
-        body.addView(commentLayout);
-
-        LinearLayout imageRow = new LinearLayout(this);
-        imageRow.setOrientation(LinearLayout.HORIZONTAL);
-        commentImageState = KinUi.muted(this, "评论图片：0 张", 13);
-        MaterialButton pickButton = KinUi.outlinedButton(this, "选择图片");
-        pickButton.setOnClickListener(v -> commentImagePicker.launch("image/*"));
-        imageRow.addView(commentImageState, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        imageRow.addView(pickButton, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        KinUi.margins(imageRow, this, 0, 12, 0, 0);
-        body.addView(imageRow);
-
-        MaterialButton sendButton = KinUi.filledButton(this, "提交评论");
-        sendButton.setOnClickListener(v -> submitComment());
-        KinUi.margins(sendButton, this, 0, 14, 0, 0);
-        body.addView(sendButton);
-
-        return body;
-    }
-
     private void renderComments(List<ForumCommentModel> comments) {
         commentsLayout.removeAllViews();
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.addView(KinUi.text(this, "评论 " + comments.size(), 18, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        header.addView(KinUi.muted(this, "热门", 14));
+        commentsLayout.addView(header);
+        View divider = KinUi.divider(this);
+        KinUi.margins(divider, this, 0, 12, 0, 12);
+        commentsLayout.addView(divider);
+
         if (comments.isEmpty()) {
             commentsLayout.addView(KinUi.muted(this, "还没有评论。", 14));
             return;
         }
         for (ForumCommentModel comment : comments) {
-            LinearLayout body = KinUi.sectionContainer(this, 16);
-            body.addView(KinUi.text(this, "#" + comment.floorNumber + " " + comment.username, 16, true));
-            TextView meta = KinUi.muted(this,
-                    comment.createdAt + (TextUtils.isEmpty(comment.replyToUsername) ? "" : " · 回复 " + comment.replyToUsername),
-                    12);
-            KinUi.margins(meta, this, 0, 6, 0, 0);
-            body.addView(meta);
-            TextView content = KinUi.muted(this, comment.content, 15);
-            KinUi.margins(content, this, 0, 10, 0, 0);
-            body.addView(content);
-            if (!comment.imageUrls.isEmpty()) {
-                View strip = KinUi.imageStrip(this, comment.imageUrls, imageLoader);
-                KinUi.margins(strip, this, 0, 12, 0, 0);
-                body.addView(strip);
-            }
-
-            MaterialButton replyButton = KinUi.outlinedButton(this, "回复");
-            replyButton.setOnClickListener(v -> {
-                replyTargetCommentId = comment.id;
-                replyHintView.setVisibility(View.VISIBLE);
-                replyHintView.setText("正在回复 @" + comment.username);
-                commentEdit.requestFocus();
-            });
-            MaterialButton reportButton = KinUi.outlinedButton(this, "举报");
-            reportButton.setOnClickListener(v -> showReportDialog("COMMENT", comment.id));
-            LinearLayout actions = KinUi.buttonRow(this, replyButton, reportButton);
-            KinUi.margins(actions, this, 0, 12, 0, 0);
-            body.addView(actions);
-            commentsLayout.addView(body);
-            View divider = KinUi.divider(this);
-            KinUi.margins(divider, this, 0, 4, 0, 4);
-            commentsLayout.addView(divider);
+            commentsLayout.addView(buildCommentItem(comment));
+            View itemDivider = KinUi.divider(this);
+            KinUi.margins(itemDivider, this, 0, 14, 0, 14);
+            commentsLayout.addView(itemDivider);
         }
+    }
+
+    private View buildCommentItem(ForumCommentModel comment) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+
+        TextView avatar = KinUi.text(this, avatarText(comment.username), 13, true);
+        avatar.setTextColor(getColor(R.color.kin_text_inverse));
+        avatar.setGravity(Gravity.CENTER);
+        GradientDrawable avatarBg = new GradientDrawable();
+        avatarBg.setShape(GradientDrawable.OVAL);
+        avatarBg.setColor(getColor(R.color.kin_chip_blue_text));
+        avatar.setBackground(avatarBg);
+        row.addView(avatar, new LinearLayout.LayoutParams(KinUi.dp(this, 42), KinUi.dp(this, 42)));
+
+        LinearLayout body = KinUi.vertical(this);
+        LinearLayout.LayoutParams bodyParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        bodyParams.leftMargin = KinUi.dp(this, 12);
+        row.addView(body, bodyParams);
+
+        body.addView(KinUi.text(this, safeText(comment.username, "用户"), 16, true));
+        TextView meta = KinUi.muted(this,
+                safeText(comment.createdAt, "") + (TextUtils.isEmpty(comment.replyToUsername) ? "" : " · 回复 " + comment.replyToUsername),
+                12);
+        KinUi.margins(meta, this, 0, 4, 0, 0);
+        body.addView(meta);
+
+        TextView content = KinUi.text(this, safeText(comment.content, ""), 16, false);
+        content.setLineSpacing(KinUi.dp(this, 3), 1f);
+        KinUi.margins(content, this, 0, 10, 0, 0);
+        body.addView(content);
+
+        if (!comment.imageUrls.isEmpty()) {
+            View strip = KinUi.imageStrip(this, comment.imageUrls, imageLoader);
+            KinUi.margins(strip, this, 0, 10, 0, 0);
+            body.addView(strip);
+        }
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        TextView reply = actionText("回复");
+        reply.setOnClickListener(v -> {
+            replyTargetCommentId = comment.id;
+            replyHintView.setText("正在回复 @" + comment.username);
+            replyHintView.setVisibility(View.VISIBLE);
+            selectTab(true);
+            commentEdit.requestFocus();
+        });
+        TextView report = actionText("举报");
+        report.setOnClickListener(v -> showReportDialog("COMMENT", comment.id));
+        actions.addView(reply);
+        actions.addView(report);
+        KinUi.margins(report, this, 18, 0, 0, 0);
+        KinUi.margins(actions, this, 0, 10, 0, 0);
+        body.addView(actions);
+        return row;
+    }
+
+    private TextView actionText(String value) {
+        TextView textView = KinUi.muted(this, value, 13);
+        textView.setPadding(0, KinUi.dp(this, 4), KinUi.dp(this, 8), KinUi.dp(this, 4));
+        return textView;
+    }
+
+    private void selectTab(boolean comments) {
+        if (bodyScroll != null) {
+            bodyScroll.setVisibility(comments ? View.GONE : View.VISIBLE);
+        }
+        if (commentsScroll != null) {
+            commentsScroll.setVisibility(comments ? View.VISIBLE : View.GONE);
+        }
+        styleTab(bodyTab, !comments);
+        styleTab(commentsTab, comments);
+    }
+
+    private void styleTab(TextView tab, boolean selected) {
+        if (tab == null) {
+            return;
+        }
+        tab.setTextColor(KinUi.color(this, selected ? com.google.android.material.R.attr.colorOnSurface : com.google.android.material.R.attr.colorOnSurfaceVariant));
+        tab.setTypeface(Typeface.create("sans-serif-medium", selected ? Typeface.BOLD : Typeface.NORMAL));
     }
 
     private void submitComment() {
@@ -413,39 +463,19 @@ public class PostDetailActivity extends AppCompatActivity {
             setLoading(false, "请先登录再评论。");
             return;
         }
-        setLoading(true, "正在提交评论…");
-        if (commentImageUris.isEmpty()) {
-            repository.createComment(postId, text(commentEdit), replyTargetCommentId, parseMentions(text(commentEdit)), new ArrayList<>(), commentCallback());
+        String content = text(commentEdit);
+        if (TextUtils.isEmpty(content)) {
+            setLoading(false, "评论内容不能为空。");
             return;
         }
-        repository.uploadBatchImages(commentImageUris, "comments", new ApiCallback<>() {
-            @Override
-            public void onSuccess(List<ImageUploadItem> data) {
-                List<String> urls = new ArrayList<>();
-                for (ImageUploadItem item : data) {
-                    urls.add(item.url);
-                }
-                repository.createComment(postId, text(commentEdit), replyTargetCommentId, parseMentions(text(commentEdit)), urls, commentCallback());
-            }
-
-            @Override
-            public void onError(ApiException exception) {
-                setLoading(false, "评论图片上传失败：" + exception.getMessage());
-            }
-        });
-    }
-
-    private ApiCallback<ForumCommentModel> commentCallback() {
-        return new ApiCallback<>() {
+        setLoading(true, "正在提交评论...");
+        repository.createComment(postId, content, replyTargetCommentId, parseMentions(content), new ArrayList<>(), new ApiCallback<>() {
             @Override
             public void onSuccess(ForumCommentModel data) {
                 commentEdit.setText("");
                 replyTargetCommentId = 0L;
                 replyHintView.setVisibility(View.GONE);
-                commentImageUris.clear();
-                if (commentImageState != null) {
-                    commentImageState.setText("评论图片：0 张");
-                }
+                selectTab(true);
                 loadComments();
             }
 
@@ -453,10 +483,13 @@ public class PostDetailActivity extends AppCompatActivity {
             public void onError(ApiException exception) {
                 setLoading(false, "评论失败：" + exception.getMessage());
             }
-        };
+        });
     }
 
     private void toggleLike() {
+        if (currentPost == null) {
+            return;
+        }
         ApiCallback<LikeStatusModel> callback = new ApiCallback<>() {
             @Override
             public void onSuccess(LikeStatusModel data) {
@@ -507,6 +540,9 @@ public class PostDetailActivity extends AppCompatActivity {
     }
 
     private void toggleFavorite() {
+        if (currentPost == null) {
+            return;
+        }
         ApiCallback<com.example.kin.model.FavoriteStatus> callback = new ApiCallback<>() {
             @Override
             public void onSuccess(com.example.kin.model.FavoriteStatus data) {
@@ -526,29 +562,42 @@ public class PostDetailActivity extends AppCompatActivity {
         }
     }
 
-    private void showMessageDialog() {
-        if (!repository.getSessionManager().isLoggedIn()) {
-            setLoading(false, "请先登录再发送站内信。");
+    private void applyLikeActionState() {
+        if (likeActionIcon == null || likeActionLabel == null || currentPost == null) {
             return;
         }
-        TextInputLayout inputLayout = KinUi.inputLayout(this, "站内信内容", true);
-        TextInputEditText editText = KinUi.edit(inputLayout);
-        new AlertDialog.Builder(this)
-                .setTitle("发给 " + currentPost.createdByUsername)
-                .setView(inputLayout)
-                .setPositiveButton("发送", (dialog, which) -> repository.sendMessage(currentPost.createdByUsername, text(editText), new ApiCallback<>() {
-                    @Override
-                    public void onSuccess(com.example.kin.model.StationMessageModel data) {
-                        setLoading(false, "消息已发送。");
-                    }
+        likeActionLabel.setText(String.valueOf(currentPost.likeCount));
+        likeActionIcon.setColorFilter(getColor(currentPost.liked ? R.color.kin_danger : R.color.kin_text_muted));
+    }
 
-                    @Override
-                    public void onError(ApiException exception) {
-                        setLoading(false, "发送失败：" + exception.getMessage());
-                    }
-                }))
-                .setNegativeButton("取消", null)
-                .show();
+    private void applyFavoriteActionState() {
+        if (favoriteActionIcon == null || favoriteActionLabel == null) {
+            return;
+        }
+        favoriteActionLabel.setText(postFavorited ? "已收藏" : "收藏");
+        favoriteActionIcon.setColorFilter(getColor(postFavorited ? R.color.kin_warning : R.color.kin_text_muted));
+    }
+
+    private void applyCommentCount() {
+        if (commentActionLabel != null) {
+            commentActionLabel.setText(String.valueOf(commentCount));
+        }
+    }
+
+    private void withdrawPost() {
+        repository.withdrawPost(postId, new ApiCallback<>() {
+            @Override
+            public void onSuccess(ForumPostModel data) {
+                currentPost = data;
+                renderPost();
+                loadComments();
+            }
+
+            @Override
+            public void onError(ApiException exception) {
+                setLoading(false, "撤回失败：" + exception.getMessage());
+            }
+        });
     }
 
     private void showReportDialog(String targetType, long targetId) {
@@ -676,17 +725,11 @@ public class PostDetailActivity extends AppCompatActivity {
         }
     }
 
-    private List<String> parseMentions(String content) {
-        List<String> mentions = new ArrayList<>();
-        if (TextUtils.isEmpty(content)) {
-            return mentions;
-        }
-        for (String part : content.split("\\s+")) {
-            if (part.startsWith("@") && part.length() > 1) {
-                mentions.add(part.substring(1).replaceAll("[^a-zA-Z0-9_\\u4e00-\\u9fa5]", ""));
-            }
-        }
-        return mentions;
+    private void openImagePreview(List<String> urls, int index) {
+        Intent intent = new Intent(this, ImagePreviewActivity.class);
+        intent.putStringArrayListExtra(ImagePreviewActivity.EXTRA_IMAGE_URLS, new ArrayList<>(urls));
+        intent.putExtra(ImagePreviewActivity.EXTRA_IMAGE_INDEX, index);
+        startActivity(intent);
     }
 
     private List<String> previewImages() {
@@ -708,12 +751,28 @@ public class PostDetailActivity extends AppCompatActivity {
 
     private String buildSummary() {
         if ("PROP_SHARE".equals(currentPost.postType)) {
-            return currentPost.mapName + " · " + translateToolType(currentPost.toolType) + " · " + currentPost.propPosition + "\n" + currentPost.throwMethod;
+            return joinNonEmpty(" · ", currentPost.mapName, translateToolType(currentPost.toolType), currentPost.propPosition)
+                    + "\n" + safeText(currentPost.throwMethod, "");
         }
         if ("TACTIC_SHARE".equals(currentPost.postType)) {
-            return currentPost.mapName + " · " + currentPost.tacticType + "\n" + currentPost.tacticDescription;
+            return joinNonEmpty(" · ", currentPost.mapName, currentPost.tacticType)
+                    + "\n" + safeText(currentPost.tacticDescription, "");
         }
-        return currentPost.content;
+        return safeText(currentPost.content, "暂无正文");
+    }
+
+    private String buildMeta() {
+        return joinNonEmpty(" · ", currentPost.createdAt, currentPost.mapName, translateType(currentPost.postType));
+    }
+
+    private String translateType(String postType) {
+        if ("TACTIC_SHARE".equals(postType)) {
+            return "战术";
+        }
+        if ("DAILY_CHAT".equals(postType)) {
+            return "日常";
+        }
+        return "道具";
     }
 
     private String translateToolType(String toolType) {
@@ -743,6 +802,19 @@ public class PostDetailActivity extends AppCompatActivity {
         }
     }
 
+    private List<String> parseMentions(String content) {
+        List<String> mentions = new ArrayList<>();
+        if (TextUtils.isEmpty(content)) {
+            return mentions;
+        }
+        for (String part : content.split("\\s+")) {
+            if (part.startsWith("@") && part.length() > 1) {
+                mentions.add(part.substring(1).replaceAll("[^a-zA-Z0-9_\\u4e00-\\u9fa5]", ""));
+            }
+        }
+        return mentions;
+    }
+
     private void setLoading(boolean loading, String message) {
         progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
         statusView.setVisibility(TextUtils.isEmpty(message) ? View.GONE : View.VISIBLE);
@@ -750,7 +822,7 @@ public class PostDetailActivity extends AppCompatActivity {
     }
 
     private String text(TextInputEditText editText) {
-        return String.valueOf(editText.getText()).trim();
+        return editText == null ? "" : String.valueOf(editText.getText()).trim();
     }
 
     private String normalizeReportReason(String rawReason) {
@@ -769,5 +841,26 @@ public class PostDetailActivity extends AppCompatActivity {
             return "ABUSE";
         }
         return "VIOLATION";
+    }
+
+    private String joinNonEmpty(String delimiter, String... values) {
+        List<String> items = new ArrayList<>();
+        for (String value : values) {
+            if (!TextUtils.isEmpty(value)) {
+                items.add(value);
+            }
+        }
+        return TextUtils.join(delimiter, items);
+    }
+
+    private String safeText(String value, String fallback) {
+        return TextUtils.isEmpty(value) ? fallback : value;
+    }
+
+    private String avatarText(String value) {
+        if (TextUtils.isEmpty(value)) {
+            return "用";
+        }
+        return value.substring(0, 1).toUpperCase(Locale.ROOT);
     }
 }
