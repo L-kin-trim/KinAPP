@@ -204,9 +204,14 @@ public class KinRepository {
     }
 
     public void getComments(long postId, ApiCallback<List<ForumCommentModel>> callback) {
+        getComments(postId, "HOT", callback);
+    }
+
+    public void getComments(long postId, String sort, ApiCallback<List<ForumCommentModel>> callback) {
         Map<String, String> query = new LinkedHashMap<>();
         query.put("page", "0");
         query.put("size", "100");
+        query.put("sort", TextUtils.isEmpty(sort) ? "HOT" : sort);
         apiClient.get("/api/forum/comments/posts/" + postId, query, true, new ApiCallback<>() {
             @Override
             public void onSuccess(JSONObject data) {
@@ -222,6 +227,14 @@ public class KinRepository {
                 callback.onError(exception);
             }
         });
+    }
+
+    public void likeComment(long commentId, ApiCallback<LikeStatusModel> callback) {
+        apiClient.post("/api/forum/comments/" + commentId + "/like", null, true, modelCallback(callback, JsonUtils::parseLikeStatus));
+    }
+
+    public void unlikeComment(long commentId, ApiCallback<LikeStatusModel> callback) {
+        apiClient.deleteJson("/api/forum/comments/" + commentId + "/like", null, true, modelCallback(callback, JsonUtils::parseLikeStatus));
     }
 
     public void createComment(long postId, String content, List<String> imageUrls, ApiCallback<ForumCommentModel> callback) {

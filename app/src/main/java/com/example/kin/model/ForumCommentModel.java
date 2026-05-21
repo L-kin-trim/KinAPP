@@ -9,6 +9,8 @@ public class ForumCommentModel {
     public long parentCommentId;
     public int floorNumber;
     public int replyCount;
+    public int likeCount;
+    public boolean liked;
     public String content;
     public String username;
     public String replyToUsername;

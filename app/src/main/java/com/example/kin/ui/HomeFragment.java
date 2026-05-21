@@ -459,42 +459,82 @@ public class HomeFragment extends BasePageFragment {
     }
 
     private void renderFeedPosts(MainActivity activity, RemoteImageLoader imageLoader) {
-        for (ForumPostModel post : posts) {
-            MaterialCardView card = KinUi.card(activity);
-            card.setClickable(true);
-            card.setFocusable(true);
-            card.setOnClickListener(v -> openPostDetail(activity, post));
-
-            LinearLayout body = KinUi.sectionContainer(activity, 16);
-            TextView title = KinUi.text(activity, safeText(post.title, "\u672a\u547d\u540d\u5e16\u5b50"), 20, true);
-            title.setMaxLines(2);
-            title.setEllipsize(TextUtils.TruncateAt.END);
-            body.addView(title);
-
-            TextView meta = KinUi.muted(activity, buildFeedMeta(post), 13);
-            meta.setMaxLines(1);
-            meta.setEllipsize(TextUtils.TruncateAt.END);
-            KinUi.margins(meta, activity, 0, 8, 0, 0);
-            body.addView(meta);
-
-            TextView summary = KinUi.text(activity, buildFeedSummary(post), 15, false);
-            summary.setMaxLines(2);
-            summary.setEllipsize(TextUtils.TruncateAt.END);
-            summary.setLineSpacing(KinUi.dp(activity, 2), 1f);
-            KinUi.margins(summary, activity, 0, 8, 0, 0);
-            body.addView(summary);
-
-            List<String> previewImages = previewImages(post);
-            if (!previewImages.isEmpty()) {
-                View images = buildImagePreviewRow(activity, previewImages, imageLoader);
-                KinUi.margins(images, activity, 0, 12, 0, 0);
-                body.addView(images);
+        for (int i = 0; i < posts.size(); i++) {
+            ForumPostModel post = posts.get(i);
+            listContainer.addView(buildFeedItem(activity, imageLoader, post));
+            if (i < posts.size() - 1) {
+                listContainer.addView(buildFeedSeparator(activity));
             }
-
-            body.addView(buildPostFooter(activity, post));
-            card.addView(body);
-            listContainer.addView(card);
         }
+    }
+
+    private View buildFeedItem(MainActivity activity, RemoteImageLoader imageLoader, ForumPostModel post) {
+        LinearLayout body = KinUi.vertical(activity);
+        body.setClickable(true);
+        body.setFocusable(true);
+        body.setPadding(KinUi.dp(activity, 16), KinUi.dp(activity, 18), KinUi.dp(activity, 16), KinUi.dp(activity, 18));
+        body.setOnClickListener(v -> openPostDetail(activity, post));
+
+        body.addView(buildFeedAuthorLine(activity, post));
+
+        TextView title = KinUi.text(activity, safeText(post.title, "\u672a\u547d\u540d\u5e16\u5b50"), 20, true);
+        title.setMaxLines(2);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        KinUi.margins(title, activity, 0, 12, 0, 0);
+        body.addView(title);
+
+        TextView summary = KinUi.text(activity, buildFeedSummary(post), 16, false);
+        summary.setMaxLines(3);
+        summary.setEllipsize(TextUtils.TruncateAt.END);
+        summary.setLineSpacing(KinUi.dp(activity, 3), 1f);
+        KinUi.margins(summary, activity, 0, 8, 0, 0);
+        body.addView(summary);
+
+        List<String> previewImages = previewImages(post);
+        if (!previewImages.isEmpty()) {
+            View images = buildImagePreviewRow(activity, previewImages, imageLoader);
+            KinUi.margins(images, activity, 0, 12, 0, 0);
+            body.addView(images);
+        }
+
+        body.addView(buildPostFooter(activity, post));
+        return body;
+    }
+
+    private View buildFeedAuthorLine(MainActivity activity, ForumPostModel post) {
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+        TextView avatar = KinUi.text(activity, avatarText(post.createdByUsername), 10, true);
+        avatar.setGravity(android.view.Gravity.CENTER);
+        avatar.setTextColor(activity.getColor(R.color.kin_text_inverse));
+        GradientDrawable avatarBg = new GradientDrawable();
+        avatarBg.setShape(GradientDrawable.OVAL);
+        avatarBg.setColor(activity.getColor(R.color.kin_accent));
+        avatar.setBackground(avatarBg);
+        row.addView(avatar, new LinearLayout.LayoutParams(KinUi.dp(activity, 24), KinUi.dp(activity, 24)));
+
+        TextView username = KinUi.muted(activity, safeText(post.createdByUsername, "\u7528\u6237"), 14);
+        username.setMaxLines(1);
+        username.setEllipsize(TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams usernameParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        usernameParams.leftMargin = KinUi.dp(activity, 8);
+        row.addView(username, usernameParams);
+
+        TextView level = buildLevelBadge(activity, post.authorLevel);
+        row.addView(level);
+        return row;
+    }
+
+    private View buildFeedSeparator(MainActivity activity) {
+        View separator = new View(activity);
+        separator.setBackgroundColor(activity.getColor(KinUi.isNight(activity) ? R.color.kin_stroke_dark : R.color.kin_stroke));
+        separator.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                KinUi.dp(activity, 8)
+        ));
+        return separator;
     }
 
     private void openPostDetail(MainActivity activity, ForumPostModel post) {
@@ -694,6 +734,13 @@ public class HomeFragment extends BasePageFragment {
 
     private String safeText(String value, String fallback) {
         return TextUtils.isEmpty(value) ? fallback : value;
+    }
+
+    private String avatarText(String value) {
+        if (TextUtils.isEmpty(value)) {
+            return "U";
+        }
+        return value.substring(0, 1).toUpperCase(Locale.ROOT);
     }
 
     private String translateType(String postType) {

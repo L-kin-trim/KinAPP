@@ -10,6 +10,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -40,8 +41,11 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class PostDetailActivity extends AppCompatActivity {
     public static final String EXTRA_POST_ID = "extra_post_id";
@@ -72,6 +76,9 @@ public class PostDetailActivity extends AppCompatActivity {
     private TextView imageCaptionView;
     private boolean postFavorited;
     private boolean showingCommentsTab;
+    private boolean tabAnimationReady;
+    private boolean tabAnimationRunning;
+    private boolean commentSortByTime;
     private long replyTargetCommentId;
     private int commentCount;
     private float swipeStartX;
@@ -115,7 +122,7 @@ public class PostDetailActivity extends AppCompatActivity {
         root.addView(contentFrame, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         root.addView(buildBottomBar());
         setContentView(root);
-        selectTab(false);
+        selectTab(false, false);
         loadAll();
     }
 
@@ -279,7 +286,7 @@ public class PostDetailActivity extends AppCompatActivity {
     }
 
     private void loadComments() {
-        repository.getComments(postId, new ApiCallback<>() {
+        repository.getComments(postId, commentSortByTime ? "TIME" : "HOT", new ApiCallback<>() {
             @Override
             public void onSuccess(List<ForumCommentModel> data) {
                 currentComments.clear();
@@ -462,7 +469,22 @@ public class PostDetailActivity extends AppCompatActivity {
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.addView(KinUi.text(this, "评论 " + comments.size(), 18, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        header.addView(KinUi.muted(this, "热门", 14));
+        TextView hotSort = sortText("热门", !commentSortByTime);
+        TextView timeSort = sortText("时间", commentSortByTime);
+        hotSort.setOnClickListener(v -> {
+            if (commentSortByTime) {
+                commentSortByTime = false;
+                loadComments();
+            }
+        });
+        timeSort.setOnClickListener(v -> {
+            if (!commentSortByTime) {
+                commentSortByTime = true;
+                loadComments();
+            }
+        });
+        header.addView(hotSort);
+        header.addView(timeSort);
         target.addView(header);
 
         if (!standalone) {
@@ -477,15 +499,80 @@ public class PostDetailActivity extends AppCompatActivity {
             target.addView(empty);
             return;
         }
-        for (ForumCommentModel comment : comments) {
-            target.addView(buildCommentItem(comment));
+        CommentBuckets buckets = groupComments(comments);
+        for (ForumCommentModel comment : buckets.parents) {
+            target.addView(buildCommentItem(comment, false));
+            List<ForumCommentModel> replies = buckets.repliesByParent.get(comment.id);
+            if (replies != null && !replies.isEmpty()) {
+                target.addView(buildReplyGroup(replies));
+            }
             View itemDivider = KinUi.divider(this);
             KinUi.margins(itemDivider, this, 0, 14, 0, 14);
             target.addView(itemDivider);
         }
     }
 
-    private View buildCommentItem(ForumCommentModel comment) {
+    private TextView sortText(String value, boolean selected) {
+        TextView textView = selected ? KinUi.text(this, value, 14, true) : KinUi.muted(this, value, 14);
+        textView.setPadding(KinUi.dp(this, 10), KinUi.dp(this, 4), 0, KinUi.dp(this, 4));
+        return textView;
+    }
+
+    private CommentBuckets groupComments(List<ForumCommentModel> comments) {
+        CommentBuckets buckets = new CommentBuckets();
+        Map<Long, ForumCommentModel> byId = new LinkedHashMap<>();
+        for (ForumCommentModel comment : comments) {
+            byId.put(comment.id, comment);
+        }
+        for (ForumCommentModel comment : comments) {
+            if (comment.parentCommentId > 0 && byId.containsKey(comment.parentCommentId)) {
+                long parentId = rootParentId(comment, byId);
+                buckets.repliesByParent
+                        .computeIfAbsent(parentId, key -> new ArrayList<>())
+                        .add(comment);
+            } else {
+                buckets.parents.add(comment);
+            }
+        }
+        if (commentSortByTime) {
+            buckets.parents.sort(Comparator.comparingInt((ForumCommentModel item) -> item.floorNumber).reversed());
+        } else {
+            buckets.parents.sort(Comparator
+                    .comparingInt((ForumCommentModel item) -> item.likeCount)
+                    .reversed()
+                    .thenComparingInt(item -> item.floorNumber));
+        }
+        for (List<ForumCommentModel> replies : buckets.repliesByParent.values()) {
+            replies.sort(Comparator.comparingInt(item -> item.floorNumber));
+        }
+        return buckets;
+    }
+
+    private long rootParentId(ForumCommentModel comment, Map<Long, ForumCommentModel> byId) {
+        long parentId = comment.parentCommentId;
+        ForumCommentModel parent = byId.get(parentId);
+        while (parent != null && parent.parentCommentId > 0 && byId.containsKey(parent.parentCommentId)) {
+            parentId = parent.parentCommentId;
+            parent = byId.get(parentId);
+        }
+        return parentId;
+    }
+
+    private View buildReplyGroup(List<ForumCommentModel> replies) {
+        LinearLayout group = KinUi.vertical(this);
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(getColor(KinUi.isNight(this) ? R.color.kin_dark_panel_alt : R.color.kin_light_panel_alt));
+        background.setCornerRadius(KinUi.dp(this, 8));
+        group.setBackground(background);
+        group.setPadding(KinUi.dp(this, 12), KinUi.dp(this, 8), KinUi.dp(this, 12), KinUi.dp(this, 8));
+        KinUi.margins(group, this, 34, 10, 0, 0);
+        for (ForumCommentModel reply : replies) {
+            group.addView(buildCommentItem(reply, true));
+        }
+        return group;
+    }
+
+    private View buildCommentItem(ForumCommentModel comment, boolean childReply) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
 
@@ -496,24 +583,23 @@ public class PostDetailActivity extends AppCompatActivity {
         avatarBg.setShape(GradientDrawable.OVAL);
         avatarBg.setColor(getColor(R.color.kin_chip_blue_text));
         avatar.setBackground(avatarBg);
-        row.addView(avatar, new LinearLayout.LayoutParams(KinUi.dp(this, 42), KinUi.dp(this, 42)));
+        int avatarSize = childReply ? KinUi.dp(this, 18) : KinUi.dp(this, 21);
+        row.addView(avatar, new LinearLayout.LayoutParams(avatarSize, avatarSize));
 
         LinearLayout body = KinUi.vertical(this);
         LinearLayout.LayoutParams bodyParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        bodyParams.leftMargin = KinUi.dp(this, 12);
+        bodyParams.leftMargin = KinUi.dp(this, 10);
         row.addView(body, bodyParams);
 
-        body.addView(KinUi.text(this, safeText(comment.username, "用户"), 16, true));
-        TextView meta = KinUi.muted(this,
-                safeText(comment.createdAt, "") + (TextUtils.isEmpty(comment.replyToUsername) ? "" : " · 回复 " + comment.replyToUsername),
-                12);
-        KinUi.margins(meta, this, 0, 4, 0, 0);
-        body.addView(meta);
+        TextView line = KinUi.text(this, buildCommentLine(comment), childReply ? 14 : 16, false);
+        line.setLineSpacing(KinUi.dp(this, 3), 1f);
+        body.addView(line);
 
-        TextView content = KinUi.text(this, safeText(comment.content, ""), 16, false);
-        content.setLineSpacing(KinUi.dp(this, 3), 1f);
-        KinUi.margins(content, this, 0, 10, 0, 0);
-        body.addView(content);
+        if (!TextUtils.isEmpty(comment.createdAt)) {
+            TextView time = KinUi.muted(this, comment.createdAt, 12);
+            KinUi.margins(time, this, 0, 4, 0, 0);
+            body.addView(time);
+        }
 
         if (!comment.imageUrls.isEmpty()) {
             View strip = KinUi.imageStrip(this, comment.imageUrls, imageLoader);
@@ -523,6 +609,11 @@ public class PostDetailActivity extends AppCompatActivity {
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
+        if (!childReply) {
+            TextView like = actionText((comment.liked ? "已赞 " : "点赞 ") + comment.likeCount);
+            like.setOnClickListener(v -> toggleCommentLike(comment));
+            actions.addView(like);
+        }
         TextView reply = actionText("回复");
         reply.setOnClickListener(v -> {
             replyTargetCommentId = comment.id;
@@ -534,10 +625,51 @@ public class PostDetailActivity extends AppCompatActivity {
         report.setOnClickListener(v -> showReportDialog("COMMENT", comment.id));
         actions.addView(reply);
         actions.addView(report);
+        KinUi.margins(reply, this, childReply ? 0 : 18, 0, 0, 0);
         KinUi.margins(report, this, 18, 0, 0, 0);
         KinUi.margins(actions, this, 0, 10, 0, 0);
         body.addView(actions);
         return row;
+    }
+
+    private String buildCommentLine(ForumCommentModel comment) {
+        String author = safeText(comment.username, "用户");
+        String replyTo = cleanReplyUsername(comment.replyToUsername);
+        String prefix = TextUtils.isEmpty(replyTo) ? author : author + "（回复 " + replyTo + "）";
+        return prefix + "：" + safeText(comment.content, "");
+    }
+
+    private String cleanReplyUsername(String value) {
+        if (TextUtils.isEmpty(value)) {
+            return "";
+        }
+        String trimmed = value.trim();
+        if ("null".equalsIgnoreCase(trimmed)) {
+            return "";
+        }
+        return trimmed;
+    }
+
+    private void toggleCommentLike(ForumCommentModel comment) {
+        ApiCallback<LikeStatusModel> callback = new ApiCallback<>() {
+            @Override
+            public void onSuccess(LikeStatusModel data) {
+                comment.liked = data.liked;
+                comment.likeCount = data.likeCount;
+                renderComments(commentsLayout, currentComments, true);
+                renderComments(bodyCommentsLayout, currentComments, false);
+            }
+
+            @Override
+            public void onError(ApiException exception) {
+                setLoading(false, "评论点赞失败：" + exception.getMessage());
+            }
+        };
+        if (comment.liked) {
+            repository.unlikeComment(comment.id, callback);
+        } else {
+            repository.likeComment(comment.id, callback);
+        }
     }
 
     private TextView actionText(String value) {
@@ -547,15 +679,70 @@ public class PostDetailActivity extends AppCompatActivity {
     }
 
     private void selectTab(boolean comments) {
-        showingCommentsTab = comments;
-        if (bodyScroll != null) {
-            bodyScroll.setVisibility(comments ? View.GONE : View.VISIBLE);
+        selectTab(comments, true);
+    }
+
+    private void selectTab(boolean comments, boolean animate) {
+        if (showingCommentsTab == comments && tabAnimationReady) {
+            styleTab(bodyTab, !comments);
+            styleTab(commentsTab, comments);
+            return;
         }
-        if (commentsScroll != null) {
-            commentsScroll.setVisibility(comments ? View.VISIBLE : View.GONE);
+        if (tabAnimationRunning) {
+            return;
+        }
+        View outgoing = showingCommentsTab ? commentsScroll : bodyScroll;
+        View incoming = comments ? commentsScroll : bodyScroll;
+        boolean toRight = !comments;
+        showingCommentsTab = comments;
+        if (!animate || !tabAnimationReady || outgoing == null || incoming == null) {
+            if (bodyScroll != null) {
+                bodyScroll.setVisibility(comments ? View.GONE : View.VISIBLE);
+                bodyScroll.setAlpha(comments ? 0f : 1f);
+                bodyScroll.setTranslationX(0f);
+            }
+            if (commentsScroll != null) {
+                commentsScroll.setVisibility(comments ? View.VISIBLE : View.GONE);
+                commentsScroll.setAlpha(comments ? 1f : 0f);
+                commentsScroll.setTranslationX(0f);
+            }
+            tabAnimationReady = true;
+            styleTab(bodyTab, !comments);
+            styleTab(commentsTab, comments);
+            return;
         }
         styleTab(bodyTab, !comments);
         styleTab(commentsTab, comments);
+
+        int distance = Math.max(getResources().getDisplayMetrics().widthPixels, 1);
+        float incomingStart = toRight ? -distance : distance;
+        float outgoingEnd = toRight ? distance : -distance;
+        tabAnimationRunning = true;
+        incoming.setVisibility(View.VISIBLE);
+        incoming.setAlpha(0f);
+        incoming.setTranslationX(incomingStart);
+        incoming.animate()
+                .translationX(0f)
+                .alpha(1f)
+                .setDuration(220)
+                .setInterpolator(new DecelerateInterpolator())
+                .withEndAction(() -> {
+                    incoming.setTranslationX(0f);
+                    incoming.setAlpha(1f);
+                })
+                .start();
+        outgoing.animate()
+                .translationX(outgoingEnd)
+                .alpha(0f)
+                .setDuration(220)
+                .setInterpolator(new DecelerateInterpolator())
+                .withEndAction(() -> {
+                    outgoing.setVisibility(View.GONE);
+                    outgoing.setTranslationX(0f);
+                    outgoing.setAlpha(1f);
+                    tabAnimationRunning = false;
+                })
+                .start();
     }
 
     private void styleTab(TextView tab, boolean selected) {
@@ -1004,5 +1191,10 @@ public class PostDetailActivity extends AppCompatActivity {
             this.url = url;
             this.caption = caption;
         }
+    }
+
+    private static final class CommentBuckets {
+        final List<ForumCommentModel> parents = new ArrayList<>();
+        final Map<Long, List<ForumCommentModel>> repliesByParent = new LinkedHashMap<>();
     }
 }

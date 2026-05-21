@@ -200,6 +200,8 @@ public final class JsonUtils {
         comment.parentCommentId = optLong(json, "parentCommentId");
         comment.floorNumber = optInt(json, "floorNumber");
         comment.replyCount = optInt(json, "replyCount");
+        comment.likeCount = optInt(json, "likeCount");
+        comment.liked = json.optBoolean("liked", json.optBoolean("likedByMe", false));
         comment.content = optString(json, "content");
         comment.username = optString(json, "username");
         comment.replyToUsername = optString(json, "replyToUsername");
