@@ -39,7 +39,7 @@ public class FutureFeatureDomainActivity extends AppCompatActivity {
         MaterialToolbar toolbar = new MaterialToolbar(this);
         toolbar.setTitle(group.title);
         toolbar.setSubtitle(group.apiPrefix);
-        toolbar.setNavigationIcon(android.R.drawable.ic_menu_revert);
+        toolbar.setNavigationIcon(R.drawable.ic_nav_back);
         toolbar.setNavigationOnClickListener(v -> finish());
         root.addView(toolbar);
 

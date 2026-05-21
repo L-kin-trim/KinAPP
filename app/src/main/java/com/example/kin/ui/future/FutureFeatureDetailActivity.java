@@ -68,7 +68,7 @@ public class FutureFeatureDetailActivity extends AppCompatActivity {
         MaterialToolbar toolbar = new MaterialToolbar(this);
         toolbar.setTitle(feature.title);
         toolbar.setSubtitle(feature.section + " · " + feature.key);
-        toolbar.setNavigationIcon(android.R.drawable.ic_menu_revert);
+        toolbar.setNavigationIcon(R.drawable.ic_nav_back);
         toolbar.setNavigationOnClickListener(v -> finish());
         root.addView(toolbar);
 

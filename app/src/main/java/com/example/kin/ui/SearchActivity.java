@@ -3,13 +3,16 @@ package com.example.kin.ui;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
-import android.widget.CheckBox;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -26,7 +29,6 @@ import com.example.kin.net.ApiCallback;
 import com.example.kin.net.ApiException;
 import com.example.kin.ui.common.KinUi;
 import com.example.kin.ui.common.RemoteImageLoader;
-import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
@@ -51,9 +53,6 @@ public class SearchActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private TextView statusView;
     private TextInputEditText keywordEdit;
-    private TextInputEditText mapEdit;
-    private TextInputEditText authorEdit;
-    private CheckBox exactCheck;
     private MaterialButton loadMoreButton;
     private final List<ForumPostModel> postResults = new ArrayList<>();
     private final List<LibraryItem> libraryResults = new ArrayList<>();
@@ -72,20 +71,15 @@ public class SearchActivity extends AppCompatActivity {
 
         LinearLayout root = KinUi.vertical(this);
         root.setBackgroundColor(getColor(KinUi.isNight(this) ? R.color.kin_dark_bg : R.color.kin_light_bg));
-
-        MaterialToolbar toolbar = new MaterialToolbar(this);
-        toolbar.setTitle(MODE_LIBRARY.equals(mode) ? "搜索收藏库" : "搜索帖子");
-        toolbar.setNavigationIcon(android.R.drawable.ic_menu_revert);
-        toolbar.setNavigationOnClickListener(v -> finish());
-        root.addView(toolbar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(buildTopSearchBar());
 
         ScrollView scrollView = new ScrollView(this);
         LinearLayout content = KinUi.vertical(this);
-        content.setPadding(KinUi.dp(this, 16), KinUi.dp(this, 12), KinUi.dp(this, 16), KinUi.dp(this, 24));
+        content.setPadding(KinUi.dp(this, 16), KinUi.dp(this, 18), KinUi.dp(this, 16), KinUi.dp(this, 24));
         scrollView.addView(content);
         root.addView(scrollView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        content.addView(buildSearchForm());
+        content.addView(buildHistorySection());
         progressBar = new ProgressBar(this);
         statusView = KinUi.muted(this, "", 13);
         statusView.setVisibility(View.GONE);
@@ -100,16 +94,40 @@ public class SearchActivity extends AppCompatActivity {
         loadMoreButton.setVisibility(View.GONE);
 
         setContentView(root);
-        setLoading(false, "输入关键词开始搜索，或点击下方历史记录。");
+        setLoading(false, "");
+        keywordEdit.requestFocus();
+        keywordEdit.postDelayed(() -> {
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(keywordEdit, InputMethodManager.SHOW_IMPLICIT);
+            }
+        }, 200L);
     }
 
-    private View buildSearchForm() {
-        MaterialCardView card = KinUi.card(this);
-        LinearLayout body = KinUi.sectionContainer(this, 16);
+    private View buildTopSearchBar() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(KinUi.dp(this, 8), KinUi.dp(this, 10), KinUi.dp(this, 12), KinUi.dp(this, 8));
 
-        keywordEdit = KinUi.edit(addInput(body, "标题 / 地图 / 点位 / 道具 / 战术", false));
+        ImageView back = new ImageView(this);
+        back.setImageResource(R.drawable.ic_nav_back);
+        back.setPadding(KinUi.dp(this, 8), KinUi.dp(this, 8), KinUi.dp(this, 8), KinUi.dp(this, 8));
+        back.setOnClickListener(v -> finish());
+        bar.addView(back, new LinearLayout.LayoutParams(KinUi.dp(this, 48), KinUi.dp(this, 48)));
+
+        TextInputLayout keywordLayout = new TextInputLayout(this);
+        keywordLayout.setStartIconDrawable(android.R.drawable.ic_menu_search);
+        keywordLayout.setHint(MODE_LIBRARY.equals(mode) ? "搜索收藏库" : "搜索帖子");
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(getColor(KinUi.isNight(this) ? R.color.kin_dark_panel_alt : R.color.kin_light_panel_alt));
+        background.setCornerRadius(KinUi.dp(this, 5));
+        keywordLayout.setBackground(background);
+
+        keywordEdit = new TextInputEditText(this);
         keywordEdit.setSingleLine(true);
         keywordEdit.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
+        keywordEdit.setTextSize(16);
         keywordEdit.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 runSearch(true);
@@ -117,40 +135,27 @@ public class SearchActivity extends AppCompatActivity {
             }
             return false;
         });
-
-        if (MODE_HOME.equals(mode)) {
-            mapEdit = KinUi.edit(addInput(body, "地图（可选）", false));
-            authorEdit = KinUi.edit(addInput(body, "作者（可选）", false));
-            exactCheck = new CheckBox(this);
-            exactCheck.setText("精确搜索");
-            body.addView(exactCheck);
-        }
-
-        View history = buildSearchHistoryView();
-        if (history != null) {
-            TextView title = KinUi.muted(this, "搜索历史", 13);
-            KinUi.margins(title, this, 0, 12, 0, 0);
-            body.addView(title);
-            KinUi.margins(history, this, 0, 8, 0, 0);
-            body.addView(history);
-        }
-
-        MaterialButton searchButton = KinUi.filledButton(this, "搜索");
-        searchButton.setOnClickListener(v -> runSearch(true));
-        KinUi.margins(searchButton, this, 0, 14, 0, 0);
-        body.addView(searchButton);
-
-        card.addView(body);
-        return card;
+        keywordLayout.addView(keywordEdit, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        bar.addView(keywordLayout, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        return bar;
     }
 
-    private TextInputLayout addInput(LinearLayout body, String hint, boolean multiLine) {
-        TextInputLayout layout = KinUi.inputLayout(this, hint, multiLine);
-        if (body.getChildCount() > 0) {
-            KinUi.margins(layout, this, 0, 10, 0, 0);
+    private View buildHistorySection() {
+        LinearLayout body = KinUi.vertical(this);
+        TextView title = KinUi.text(this, "搜索历史", 20, true);
+        body.addView(title);
+        View history = buildSearchHistoryView();
+        if (history != null) {
+            KinUi.margins(history, this, 0, 14, 0, 0);
+            body.addView(history);
+        } else {
+            TextView empty = KinUi.muted(this, "暂无搜索历史", 15);
+            KinUi.margins(empty, this, 0, 14, 0, 0);
+            body.addView(empty);
         }
-        body.addView(layout);
-        return layout;
+        return body;
     }
 
     private View buildSearchHistoryView() {
@@ -165,8 +170,10 @@ public class SearchActivity extends AppCompatActivity {
         scrollView.addView(row);
         for (String term : history) {
             Chip chip = KinUi.chip(this, term);
+            chip.setTextSize(16);
             chip.setOnClickListener(v -> {
                 keywordEdit.setText(term);
+                keywordEdit.setSelection(keywordEdit.length());
                 runSearch(true);
             });
             row.addView(chip);
@@ -185,7 +192,7 @@ public class SearchActivity extends AppCompatActivity {
         }
         rememberSearchTerm(keyword);
         if (MODE_LIBRARY.equals(mode)) {
-            searchLibrary();
+            searchLibrary(keyword);
         } else {
             searchPosts(keyword);
         }
@@ -193,11 +200,10 @@ public class SearchActivity extends AppCompatActivity {
 
     private void searchPosts(String keyword) {
         setLoading(true, "正在搜索帖子...");
-        repository.searchPosts(keyword, "", text(mapEdit), text(authorEdit), page, 10, "LATEST", "", "", new ApiCallback<>() {
+        repository.searchPosts(keyword, "", "", "", page, 10, "LATEST", "", "", new ApiCallback<>() {
             @Override
             public void onSuccess(PageResult<ForumPostModel> data) {
-                List<ForumPostModel> items = exactCheck != null && exactCheck.isChecked() ? exactFiltered(data.items) : data.items;
-                postResults.addAll(items);
+                postResults.addAll(data.items);
                 page = data.page + 1;
                 lastPage = data.page + 1 >= data.totalPages;
                 renderPostResults();
@@ -211,13 +217,13 @@ public class SearchActivity extends AppCompatActivity {
         });
     }
 
-    private void searchLibrary() {
+    private void searchLibrary(String keyword) {
         setLoading(true, "正在搜索收藏库...");
         repository.getFavorites("", page, 30, new ApiCallback<>() {
             @Override
             public void onSuccess(PageResult<LibraryItem> data) {
                 for (LibraryItem item : data.items) {
-                    if (matchesLibrary(item, text(keywordEdit))) {
+                    if (matchesLibrary(item, keyword)) {
                         libraryResults.add(item);
                     }
                 }
@@ -291,33 +297,6 @@ public class SearchActivity extends AppCompatActivity {
                 repository.getSessionManager().getUser() != null
                         && TextUtils.equals(author, repository.getSessionManager().getUser().username));
         startActivity(intent);
-    }
-
-    private List<ForumPostModel> exactFiltered(List<ForumPostModel> source) {
-        List<ForumPostModel> result = new ArrayList<>();
-        for (ForumPostModel post : source) {
-            if (exactMatch(text(keywordEdit), post.title, post.mapName, post.propName, post.toolType,
-                    post.throwMethod, post.propPosition, post.tacticName, post.tacticType,
-                    post.tacticDescription, post.content)
-                    && exactMatch(text(mapEdit), post.mapName)
-                    && exactMatch(text(authorEdit), post.createdByUsername)) {
-                result.add(post);
-            }
-        }
-        return result;
-    }
-
-    private boolean exactMatch(String query, String... values) {
-        if (TextUtils.isEmpty(query)) {
-            return true;
-        }
-        String normalizedQuery = query.trim().toLowerCase(Locale.ROOT);
-        for (String value : values) {
-            if (!TextUtils.isEmpty(value) && normalizedQuery.equals(value.trim().toLowerCase(Locale.ROOT))) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private boolean matchesLibrary(LibraryItem item, String query) {

@@ -136,7 +136,7 @@ public class PublishEditorActivity extends AppCompatActivity {
 
         MaterialToolbar toolbar = new MaterialToolbar(this);
         toolbar.setTitle("发布帖子");
-        toolbar.setNavigationIcon(android.R.drawable.ic_menu_revert);
+        toolbar.setNavigationIcon(R.drawable.ic_nav_back);
         toolbar.setNavigationOnClickListener(v -> finish());
         root.addView(toolbar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 

@@ -1,10 +1,14 @@
 package com.example.kin.ui;
 
 import android.content.Intent;
+import android.graphics.drawable.GradientDrawable;
+import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.example.kin.R;
 import com.example.kin.MainActivity;
 import com.example.kin.data.SessionManager;
 import com.example.kin.model.SessionUser;
@@ -47,17 +51,40 @@ public class ProfileFragment extends BasePageFragment {
     private View profileCard(MainActivity activity, SessionManager sessionManager, SessionUser user) {
         MaterialCardView card = KinUi.card(activity);
         LinearLayout body = KinUi.sectionContainer(activity, 18);
-        body.addView(KinUi.text(activity, sessionManager.isLoggedIn() ? user.username : "\u672a\u767b\u5f55", 24, true));
-        TextView subtitle = KinUi.muted(activity,
-                sessionManager.isLoggedIn() ? ("\u89d2\u8272: " + user.role + " | \u7528\u6237ID " + user.id) : "\u767b\u5f55\u540e\u53ef\u53d1\u5e16\u3001\u8bc4\u8bba\u3001\u6536\u85cf\u4e0e\u79c1\u4fe1\u3002",
-                14);
-        KinUi.margins(subtitle, activity, 0, 8, 0, 0);
-        body.addView(subtitle);
-        TextView endpoint = KinUi.muted(activity, "\u670d\u52a1\u5730\u5740: " + sessionManager.getBaseUrl(), 13);
-        KinUi.margins(endpoint, activity, 0, 12, 0, 0);
-        body.addView(endpoint);
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+
+        String username = sessionManager.isLoggedIn() && user != null ? user.username : "\u672a\u767b\u5f55";
+        TextView avatar = KinUi.text(activity, avatarText(username), 24, true);
+        avatar.setGravity(Gravity.CENTER);
+        avatar.setTextColor(activity.getColor(R.color.kin_text_inverse));
+        GradientDrawable avatarBg = new GradientDrawable();
+        avatarBg.setShape(GradientDrawable.OVAL);
+        avatarBg.setColor(activity.getColor(R.color.kin_accent));
+        avatar.setBackground(avatarBg);
+        row.addView(avatar, new LinearLayout.LayoutParams(KinUi.dp(activity, 72), KinUi.dp(activity, 72)));
+
+        LinearLayout info = KinUi.vertical(activity);
+        TextView name = KinUi.text(activity, username, 24, true);
+        TextView level = KinUi.muted(activity, "Lv.0", 15);
+        info.addView(name);
+        KinUi.margins(level, activity, 0, 6, 0, 0);
+        info.addView(level);
+        LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        infoParams.leftMargin = KinUi.dp(activity, 16);
+        row.addView(info, infoParams);
+
+        body.addView(row);
         card.addView(body);
         return card;
+    }
+
+    private String avatarText(String value) {
+        if (TextUtils.isEmpty(value) || "\u672a\u767b\u5f55".equals(value)) {
+            return "\u6211";
+        }
+        return value.substring(0, 1).toUpperCase();
     }
 
     private View updateCard(MainActivity activity) {
