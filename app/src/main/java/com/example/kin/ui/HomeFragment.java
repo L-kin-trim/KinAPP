@@ -24,6 +24,7 @@ import com.example.kin.net.ApiCallback;
 import com.example.kin.net.ApiException;
 import com.example.kin.ui.common.BasePageFragment;
 import com.example.kin.ui.common.KinUi;
+import com.example.kin.ui.common.LevelVisuals;
 import com.example.kin.ui.common.RemoteImageLoader;
 import com.example.kin.util.JsonUtils;
 import com.google.android.material.button.MaterialButton;
@@ -509,9 +510,7 @@ public class HomeFragment extends BasePageFragment {
         TextView avatar = KinUi.text(activity, avatarText(post.createdByUsername), 10, true);
         avatar.setGravity(android.view.Gravity.CENTER);
         avatar.setTextColor(activity.getColor(R.color.kin_text_inverse));
-        GradientDrawable avatarBg = new GradientDrawable();
-        avatarBg.setShape(GradientDrawable.OVAL);
-        avatarBg.setColor(activity.getColor(R.color.kin_accent));
+        GradientDrawable avatarBg = LevelVisuals.avatarBackground(post.authorLevel);
         avatar.setBackground(avatarBg);
         row.addView(avatar, new LinearLayout.LayoutParams(KinUi.dp(activity, 24), KinUi.dp(activity, 24)));
 
@@ -532,7 +531,7 @@ public class HomeFragment extends BasePageFragment {
         separator.setBackgroundColor(activity.getColor(KinUi.isNight(activity) ? R.color.kin_stroke_dark : R.color.kin_stroke));
         separator.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                KinUi.dp(activity, 8)
+                KinUi.dp(activity, 1)
         ));
         return separator;
     }
@@ -559,11 +558,9 @@ public class HomeFragment extends BasePageFragment {
     }
 
     private TextView buildLevelBadge(MainActivity activity, int authorLevel) {
-        TextView badge = KinUi.text(activity, "Lv." + Math.max(authorLevel, 0), 11, true);
+        TextView badge = KinUi.text(activity, "Lv." + LevelVisuals.normalize(authorLevel), 11, true);
         badge.setTextColor(activity.getColor(R.color.kin_text_inverse));
-        GradientDrawable background = new GradientDrawable();
-        background.setColor(activity.getColor(R.color.kin_danger));
-        background.setCornerRadius(KinUi.dp(activity, 5));
+        GradientDrawable background = LevelVisuals.badgeBackground(activity, authorLevel);
         badge.setBackground(background);
         badge.setPadding(KinUi.dp(activity, 5), KinUi.dp(activity, 2), KinUi.dp(activity, 5), KinUi.dp(activity, 2));
         return badge;

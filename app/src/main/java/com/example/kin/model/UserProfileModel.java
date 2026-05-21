@@ -5,6 +5,10 @@ import java.util.List;
 
 public class UserProfileModel {
     public String username;
+    public int level;
+    public int experience;
+    public int levelProgressExperience;
+    public int nextLevelExperience;
     public int postCount;
     public int approvedPostCount;
     public double approvalRate;

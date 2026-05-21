@@ -157,7 +157,7 @@ public class CheckInActivity extends AppCompatActivity {
 
         LinearLayout textBlock = KinUi.vertical(this);
         textBlock.addView(KinUi.text(this, "签到", 20, true));
-        TextView reward = KinUi.muted(this, "连续 7 天以上奖励翻倍", 13);
+        TextView reward = KinUi.muted(this, "每日签到 +10 经验", 13);
         KinUi.margins(reward, this, 0, 6, 0, 0);
         textBlock.addView(reward);
 

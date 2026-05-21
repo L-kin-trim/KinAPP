@@ -4,6 +4,8 @@ public class SessionUser {
     public long id;
     public String username;
     public String role;
+    public int level;
+    public int experience;
     public long loggedInAt;
     public long updatedAt;
 

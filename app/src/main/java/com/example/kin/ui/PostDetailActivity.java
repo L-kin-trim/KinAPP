@@ -1,5 +1,6 @@
 package com.example.kin.ui;
 
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -10,6 +11,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -32,6 +34,7 @@ import com.example.kin.model.LikeStatusModel;
 import com.example.kin.net.ApiCallback;
 import com.example.kin.net.ApiException;
 import com.example.kin.ui.common.KinUi;
+import com.example.kin.ui.common.LevelVisuals;
 import com.example.kin.ui.common.RemoteImageLoader;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
@@ -228,6 +231,7 @@ public class PostDetailActivity extends AppCompatActivity {
         row.addView(bottomIcon(commentIcon, commentActionLabel, R.drawable.ic_action_comment, v -> {
             selectTab(true);
             commentEdit.requestFocus();
+            showKeyboard();
         }));
 
         root.addView(row);
@@ -365,15 +369,16 @@ public class PostDetailActivity extends AppCompatActivity {
         TextView avatar = KinUi.text(this, avatarText(currentPost.createdByUsername), 16, true);
         avatar.setGravity(Gravity.CENTER);
         avatar.setTextColor(getColor(R.color.kin_text_inverse));
-        GradientDrawable avatarBg = new GradientDrawable();
-        avatarBg.setShape(GradientDrawable.OVAL);
-        avatarBg.setColor(getColor(R.color.kin_accent));
+        GradientDrawable avatarBg = LevelVisuals.avatarBackground(currentPost.authorLevel);
         avatar.setBackground(avatarBg);
         row.addView(avatar, new LinearLayout.LayoutParams(KinUi.dp(this, 56), KinUi.dp(this, 56)));
 
         LinearLayout info = KinUi.vertical(this);
         TextView name = KinUi.text(this, safeText(currentPost.createdByUsername, "用户"), 16, true);
-        TextView level = KinUi.muted(this, "Lv." + Math.max(currentPost.authorLevel, 0), 13);
+        TextView level = KinUi.text(this, "Lv." + LevelVisuals.normalize(currentPost.authorLevel), 12, true);
+        level.setTextColor(getColor(R.color.kin_text_inverse));
+        level.setBackground(LevelVisuals.badgeBackground(this, currentPost.authorLevel));
+        level.setPadding(KinUi.dp(this, 6), KinUi.dp(this, 2), KinUi.dp(this, 6), KinUi.dp(this, 2));
         info.addView(name);
         info.addView(level);
         LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
@@ -620,6 +625,7 @@ public class PostDetailActivity extends AppCompatActivity {
             replyHintView.setText("正在回复 @" + comment.username);
             replyHintView.setVisibility(View.VISIBLE);
             commentEdit.requestFocus();
+            showKeyboard();
         });
         TextView report = actionText("举报");
         report.setOnClickListener(v -> showReportDialog("COMMENT", comment.id));
@@ -648,6 +654,15 @@ public class PostDetailActivity extends AppCompatActivity {
             return "";
         }
         return trimmed;
+    }
+
+    private void showKeyboard() {
+        commentEdit.post(() -> {
+            InputMethodManager manager = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (manager != null) {
+                manager.showSoftInput(commentEdit, InputMethodManager.SHOW_IMPLICIT);
+            }
+        });
     }
 
     private void toggleCommentLike(ForumCommentModel comment) {

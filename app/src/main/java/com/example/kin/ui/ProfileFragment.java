@@ -12,15 +12,21 @@ import com.example.kin.R;
 import com.example.kin.MainActivity;
 import com.example.kin.data.SessionManager;
 import com.example.kin.model.SessionUser;
+import com.example.kin.model.UserProfileModel;
+import com.example.kin.net.ApiCallback;
+import com.example.kin.net.ApiException;
 import com.example.kin.ui.admin.AdminCenterActivity;
 import com.example.kin.ui.common.BasePageFragment;
 import com.example.kin.ui.common.KinUi;
+import com.example.kin.ui.common.LevelVisuals;
 import com.example.kin.ui.future.FutureFeatureCenterActivity;
 import com.example.kin.ui.future.FutureFeatureDetailActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 
 public class ProfileFragment extends BasePageFragment {
+    private UserProfileModel profile;
+
     @Override
     protected void onPageReady() {
         render();
@@ -41,14 +47,20 @@ public class ProfileFragment extends BasePageFragment {
 
         SessionManager sessionManager = activity.getRepository().getSessionManager();
         SessionUser user = sessionManager.getUser();
+        if (!sessionManager.isLoggedIn()) {
+            profile = null;
+        }
 
-        contentLayout.addView(profileCard(activity, sessionManager, user));
+        contentLayout.addView(profileCard(activity, sessionManager, user, profile));
         contentLayout.addView(updateCard(activity));
         contentLayout.addView(actionsCard(activity, sessionManager, user));
         setLoading(false, "");
+        if (sessionManager.isLoggedIn() && profile == null) {
+            loadProfile(activity);
+        }
     }
 
-    private View profileCard(MainActivity activity, SessionManager sessionManager, SessionUser user) {
+    private View profileCard(MainActivity activity, SessionManager sessionManager, SessionUser user, UserProfileModel data) {
         MaterialCardView card = KinUi.card(activity);
         LinearLayout body = KinUi.sectionContainer(activity, 18);
         LinearLayout row = new LinearLayout(activity);
@@ -59,18 +71,24 @@ public class ProfileFragment extends BasePageFragment {
         TextView avatar = KinUi.text(activity, avatarText(username), 24, true);
         avatar.setGravity(Gravity.CENTER);
         avatar.setTextColor(activity.getColor(R.color.kin_text_inverse));
-        GradientDrawable avatarBg = new GradientDrawable();
-        avatarBg.setShape(GradientDrawable.OVAL);
-        avatarBg.setColor(activity.getColor(R.color.kin_accent));
+        int levelValue = data != null ? data.level : (user == null ? 1 : user.level);
+        int experience = data != null ? data.experience : (user == null ? 0 : user.experience);
+        GradientDrawable avatarBg = LevelVisuals.avatarBackground(levelValue);
         avatar.setBackground(avatarBg);
         row.addView(avatar, new LinearLayout.LayoutParams(KinUi.dp(activity, 72), KinUi.dp(activity, 72)));
 
         LinearLayout info = KinUi.vertical(activity);
         TextView name = KinUi.text(activity, username, 24, true);
-        TextView level = KinUi.muted(activity, "Lv.0", 15);
+        TextView level = KinUi.text(activity, "Lv." + LevelVisuals.normalize(levelValue), 14, true);
+        level.setTextColor(activity.getColor(R.color.kin_text_inverse));
+        level.setBackground(LevelVisuals.badgeBackground(activity, levelValue));
+        level.setPadding(KinUi.dp(activity, 7), KinUi.dp(activity, 2), KinUi.dp(activity, 7), KinUi.dp(activity, 2));
+        TextView xp = KinUi.muted(activity, "经验 " + experience, 13);
         info.addView(name);
         KinUi.margins(level, activity, 0, 6, 0, 0);
         info.addView(level);
+        KinUi.margins(xp, activity, 0, 6, 0, 0);
+        info.addView(xp);
         LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         infoParams.leftMargin = KinUi.dp(activity, 16);
         row.addView(info, infoParams);
@@ -78,6 +96,21 @@ public class ProfileFragment extends BasePageFragment {
         body.addView(row);
         card.addView(body);
         return card;
+    }
+
+    private void loadProfile(MainActivity activity) {
+        activity.getRepository().getUserProfile("", new ApiCallback<>() {
+            @Override
+            public void onSuccess(UserProfileModel data) {
+                profile = data;
+                render();
+            }
+
+            @Override
+            public void onError(ApiException exception) {
+                profile = null;
+            }
+        });
     }
 
     private String avatarText(String value) {

@@ -77,6 +77,8 @@ public class UserProfileActivity extends AppCompatActivity {
         MaterialCardView card = KinUi.card(this);
         LinearLayout body = KinUi.sectionContainer(this, 18);
         body.addView(KinUi.text(this, data.username, 22, true));
+        body.addView(info("等级", "Lv." + Math.max(1, data.level)));
+        body.addView(info("经验", data.levelProgressExperience + "/" + data.nextLevelExperience + "（总经验 " + data.experience + "）"));
         body.addView(info("发帖数", String.valueOf(data.postCount)));
         body.addView(info("通过发帖数", String.valueOf(data.approvedPostCount)));
         body.addView(info("通过率", String.format("%.2f", data.approvalRate)));

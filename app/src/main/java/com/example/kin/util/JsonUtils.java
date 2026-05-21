@@ -100,6 +100,8 @@ public final class JsonUtils {
         user.id = optLong(json, "id");
         user.username = optString(json, "username");
         user.role = optString(json, "role");
+        user.level = optInt(json, "level");
+        user.experience = optInt(json, "experience");
         user.loggedInAt = optLong(json, "loggedInAt");
         user.updatedAt = optLong(json, "updatedAt");
         return user;
@@ -318,6 +320,10 @@ public final class JsonUtils {
     public static UserProfileModel parseUserProfile(JSONObject json) {
         UserProfileModel model = new UserProfileModel();
         model.username = optString(json, "username");
+        model.level = optInt(json, "level");
+        model.experience = optInt(json, "experience");
+        model.levelProgressExperience = optInt(json, "levelProgressExperience");
+        model.nextLevelExperience = optInt(json, "nextLevelExperience");
         model.postCount = optInt(json, "postCount");
         model.approvedPostCount = optInt(json, "approvedPostCount");
         model.approvalRate = json == null ? 0d : json.optDouble("approvalRate", 0d);
