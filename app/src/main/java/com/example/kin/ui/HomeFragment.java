@@ -59,6 +59,7 @@ public class HomeFragment extends BasePageFragment {
     protected void onPageReady() {
         MainActivity activity = (MainActivity) requireActivity();
         activity.setTopBar("首页", "");
+        contentLayout.setPadding(KinUi.dp(activity, 12), KinUi.dp(activity, 10), KinUi.dp(activity, 12), KinUi.dp(activity, 24));
 
         listContainer = KinUi.vertical(activity);
         contentLayout.addView(listContainer, new LinearLayout.LayoutParams(
@@ -473,7 +474,7 @@ public class HomeFragment extends BasePageFragment {
         LinearLayout body = KinUi.vertical(activity);
         body.setClickable(true);
         body.setFocusable(true);
-        body.setPadding(KinUi.dp(activity, 16), KinUi.dp(activity, 18), KinUi.dp(activity, 16), KinUi.dp(activity, 18));
+        body.setPadding(KinUi.dp(activity, 10), KinUi.dp(activity, 16), KinUi.dp(activity, 10), KinUi.dp(activity, 16));
         body.setOnClickListener(v -> openPostDetail(activity, post));
 
         body.addView(buildFeedAuthorLine(activity, post));
@@ -563,6 +564,7 @@ public class HomeFragment extends BasePageFragment {
         GradientDrawable background = LevelVisuals.badgeBackground(activity, authorLevel);
         badge.setBackground(background);
         badge.setPadding(KinUi.dp(activity, 5), KinUi.dp(activity, 2), KinUi.dp(activity, 5), KinUi.dp(activity, 2));
+        badge.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         return badge;
     }
 

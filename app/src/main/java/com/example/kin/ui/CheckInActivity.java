@@ -108,7 +108,10 @@ public class CheckInActivity extends AppCompatActivity {
             public void onSuccess(CheckInSummary data) {
                 summary = data;
                 render();
-                setLoading(false, successMessage);
+                String message = data.gainedExperience > 0
+                        ? successMessage + " + " + data.gainedExperience + " 经验"
+                        : successMessage;
+                setLoading(false, message);
             }
 
             @Override
@@ -138,7 +141,13 @@ public class CheckInActivity extends AppCompatActivity {
         SessionUser user = repository.getSessionManager().getUser();
         TextView name = KinUi.text(this, user == null || TextUtils.isEmpty(user.username) ? "Kin 用户" : user.username, 24, true);
         name.setTextColor(getColor(R.color.kin_text_inverse));
-        TextView level = KinUi.muted(this, "每日任务 · 连续签到 " + summary.currentStreakDays + " 天", 14);
+        int currentLevel = Math.max(summary.userLevel, user == null ? 1 : user.level);
+        int nextExperience = summary.nextLevelExperience > 0 ? summary.nextLevelExperience : 200;
+        TextView level = KinUi.muted(this,
+                "Lv." + Math.max(currentLevel, 1)
+                        + " · 经验 " + summary.levelProgressExperience + "/" + nextExperience
+                        + " · 连续签到 " + summary.currentStreakDays + " 天",
+                14);
         level.setTextColor(getColor(R.color.kin_accent_soft));
 
         body.addView(name);

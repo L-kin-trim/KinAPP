@@ -26,6 +26,7 @@ import com.google.android.material.card.MaterialCardView;
 
 public class ProfileFragment extends BasePageFragment {
     private UserProfileModel profile;
+    private boolean profileLoading;
 
     @Override
     protected void onPageReady() {
@@ -35,6 +36,7 @@ public class ProfileFragment extends BasePageFragment {
     @Override
     public void onResume() {
         super.onResume();
+        profile = null;
         render();
     }
 
@@ -85,8 +87,11 @@ public class ProfileFragment extends BasePageFragment {
         level.setPadding(KinUi.dp(activity, 7), KinUi.dp(activity, 2), KinUi.dp(activity, 7), KinUi.dp(activity, 2));
         TextView xp = KinUi.muted(activity, "经验 " + experience, 13);
         info.addView(name);
-        KinUi.margins(level, activity, 0, 6, 0, 0);
-        info.addView(level);
+        LinearLayout.LayoutParams levelParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        levelParams.topMargin = KinUi.dp(activity, 6);
+        info.addView(level, levelParams);
         KinUi.margins(xp, activity, 0, 6, 0, 0);
         info.addView(xp);
         LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
@@ -99,15 +104,21 @@ public class ProfileFragment extends BasePageFragment {
     }
 
     private void loadProfile(MainActivity activity) {
+        if (profileLoading) {
+            return;
+        }
+        profileLoading = true;
         activity.getRepository().getUserProfile("", new ApiCallback<>() {
             @Override
             public void onSuccess(UserProfileModel data) {
+                profileLoading = false;
                 profile = data;
                 render();
             }
 
             @Override
             public void onError(ApiException exception) {
+                profileLoading = false;
                 profile = null;
             }
         });

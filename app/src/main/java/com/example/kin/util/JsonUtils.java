@@ -408,6 +408,11 @@ public final class JsonUtils {
         if (summary.totalSignedDays == 0) {
             summary.totalSignedDays = optInt(json, "totalDays");
         }
+        summary.userLevel = optInt(json, "userLevel");
+        summary.userExperience = optInt(json, "userExperience");
+        summary.levelProgressExperience = optInt(json, "levelProgressExperience");
+        summary.nextLevelExperience = optInt(json, "nextLevelExperience");
+        summary.gainedExperience = optInt(json, "gainedExperience");
         int responseYear = optInt(json, "year");
         int responseMonth = optInt(json, "month");
         if (responseYear > 0) {

@@ -380,7 +380,7 @@ public class PostDetailActivity extends AppCompatActivity {
         level.setBackground(LevelVisuals.badgeBackground(this, currentPost.authorLevel));
         level.setPadding(KinUi.dp(this, 6), KinUi.dp(this, 2), KinUi.dp(this, 6), KinUi.dp(this, 2));
         info.addView(name);
-        info.addView(level);
+        info.addView(level, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         infoParams.leftMargin = KinUi.dp(this, 14);
         row.addView(info, infoParams);
