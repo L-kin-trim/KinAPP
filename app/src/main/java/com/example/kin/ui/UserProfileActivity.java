@@ -13,6 +13,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.kin.R;
 import com.example.kin.data.KinRepository;
+import com.example.kin.model.SessionUser;
 import com.example.kin.model.UserProfileModel;
 import com.example.kin.net.ApiCallback;
 import com.example.kin.net.ApiException;
@@ -76,7 +77,9 @@ public class UserProfileActivity extends AppCompatActivity {
     private void render(UserProfileModel data) {
         MaterialCardView card = KinUi.card(this);
         LinearLayout body = KinUi.sectionContainer(this, 18);
-        body.addView(KinUi.text(this, data.username, 22, true));
+        SessionUser user = repository.getSessionManager().getUser();
+        String username = TextUtils.isEmpty(data.username) && user != null ? user.username : data.username;
+        body.addView(KinUi.text(this, TextUtils.isEmpty(username) ? "我" : username, 22, true));
         body.addView(info("等级", "Lv." + Math.max(1, data.level)));
         body.addView(info("经验", data.levelProgressExperience + "/" + data.nextLevelExperience + "（总经验 " + data.experience + "）"));
         body.addView(info("发帖数", String.valueOf(data.postCount)));

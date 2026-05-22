@@ -686,7 +686,7 @@ public class KinRepository {
     }
 
     public void getUserProfile(String username, ApiCallback<UserProfileModel> callback) {
-        String path = TextUtils.isEmpty(username) ? "/api/users/me/profile" : "/api/users/" + username + "/profile";
+        String path = TextUtils.isEmpty(username) ? "/api/users/checkins/summary" : "/api/users/" + username + "/profile";
         apiClient.get(path, null, true, modelCallback(callback, JsonUtils::parseUserProfile));
     }
 

@@ -320,10 +320,18 @@ public final class JsonUtils {
     public static UserProfileModel parseUserProfile(JSONObject json) {
         UserProfileModel model = new UserProfileModel();
         model.username = optString(json, "username");
-        model.level = optInt(json, "level");
-        model.experience = optInt(json, "experience");
-        model.levelProgressExperience = optInt(json, "levelProgressExperience");
-        model.nextLevelExperience = optInt(json, "nextLevelExperience");
+        model.experience = optFirstInt(json, "experience", "userExperience", "authorExperience", "totalExperience");
+        model.nextLevelExperience = optFirstInt(json, "nextLevelExperience", "experiencePerLevel");
+        if (model.nextLevelExperience <= 0) {
+            model.nextLevelExperience = 200;
+        }
+        int parsedLevel = optFirstInt(json, "level", "userLevel", "authorLevel");
+        int derivedLevel = levelFromExperience(model.experience, model.nextLevelExperience);
+        model.level = model.experience > 0 ? Math.max(parsedLevel, derivedLevel) : Math.max(1, parsedLevel);
+        model.levelProgressExperience = optFirstInt(json, "levelProgressExperience", "progressExperience", "userLevelProgressExperience");
+        if (model.experience > 0 && model.levelProgressExperience <= 0) {
+            model.levelProgressExperience = progressFromExperience(model.experience, model.nextLevelExperience);
+        }
         model.postCount = optInt(json, "postCount");
         model.approvedPostCount = optInt(json, "approvedPostCount");
         model.approvalRate = json == null ? 0d : json.optDouble("approvalRate", 0d);
@@ -333,6 +341,32 @@ public final class JsonUtils {
         model.activeStreakDays = optInt(json, "activeStreakDays");
         model.badges.addAll(optStringList(json, "badges"));
         return model;
+    }
+
+    private static int optFirstInt(JSONObject json, String... keys) {
+        if (json == null || keys == null) {
+            return 0;
+        }
+        for (String key : keys) {
+            if (json.has(key) && !json.isNull(key)) {
+                return json.optInt(key, 0);
+            }
+        }
+        return 0;
+    }
+
+    private static int levelFromExperience(int experience, int experiencePerLevel) {
+        int safePerLevel = Math.max(1, experiencePerLevel);
+        int safeExperience = Math.max(0, experience);
+        return Math.min(20, (safeExperience / safePerLevel) + 1);
+    }
+
+    private static int progressFromExperience(int experience, int experiencePerLevel) {
+        int safePerLevel = Math.max(1, experiencePerLevel);
+        if (levelFromExperience(experience, safePerLevel) >= 20) {
+            return safePerLevel;
+        }
+        return Math.max(0, experience) % safePerLevel;
     }
 
     public static SearchSuggestionModel parseSuggestion(JSONObject json) {
