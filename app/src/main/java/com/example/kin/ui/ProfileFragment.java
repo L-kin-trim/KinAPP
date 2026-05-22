@@ -1,6 +1,7 @@
 package com.example.kin.ui;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -25,6 +26,13 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 
 public class ProfileFragment extends BasePageFragment {
+    private static final String PROFILE_CACHE_PREFS = "kin_profile_cache";
+    private static final String KEY_USERNAME = "username";
+    private static final String KEY_LEVEL = "level";
+    private static final String KEY_EXPERIENCE = "experience";
+    private static final String KEY_LEVEL_PROGRESS = "levelProgressExperience";
+    private static final String KEY_NEXT_LEVEL = "nextLevelExperience";
+
     private UserProfileModel profile;
     private boolean profileLoading;
 
@@ -36,7 +44,6 @@ public class ProfileFragment extends BasePageFragment {
     @Override
     public void onResume() {
         super.onResume();
-        profile = null;
         render();
     }
 
@@ -51,9 +58,15 @@ public class ProfileFragment extends BasePageFragment {
         SessionUser user = sessionManager.getUser();
         if (!sessionManager.isLoggedIn()) {
             profile = null;
+        } else if (profile == null) {
+            profile = loadCachedProfile(activity, user);
         }
 
-        contentLayout.addView(profileCard(activity, sessionManager, user, profile));
+        if (sessionManager.isLoggedIn() && profile == null) {
+            contentLayout.addView(profileLoadingCard(activity, user));
+        } else {
+            contentLayout.addView(profileCard(activity, sessionManager, user, profile));
+        }
         contentLayout.addView(updateCard(activity));
         contentLayout.addView(actionsCard(activity, sessionManager, user));
         setLoading(false, "");
@@ -113,6 +126,7 @@ public class ProfileFragment extends BasePageFragment {
             public void onSuccess(UserProfileModel data) {
                 profileLoading = false;
                 profile = data;
+                cacheProfile(activity, activity.getRepository().getSessionManager().getUser(), data);
                 render();
             }
 
@@ -122,6 +136,54 @@ public class ProfileFragment extends BasePageFragment {
                 profile = null;
             }
         });
+    }
+
+    private View profileLoadingCard(MainActivity activity, SessionUser user) {
+        MaterialCardView card = KinUi.card(activity);
+        LinearLayout body = KinUi.sectionContainer(activity, 18);
+        String username = user == null || TextUtils.isEmpty(user.username) ? "我" : user.username;
+        body.addView(KinUi.text(activity, username, 22, true));
+        TextView syncing = KinUi.muted(activity, "正在同步等级和经验...", 14);
+        KinUi.margins(syncing, activity, 0, 8, 0, 0);
+        body.addView(syncing);
+        card.addView(body);
+        return card;
+    }
+
+    private UserProfileModel loadCachedProfile(MainActivity activity, SessionUser user) {
+        if (user == null || TextUtils.isEmpty(user.username)) {
+            return null;
+        }
+        SharedPreferences prefs = activity.getSharedPreferences(PROFILE_CACHE_PREFS, android.content.Context.MODE_PRIVATE);
+        if (!TextUtils.equals(user.username, prefs.getString(KEY_USERNAME, ""))) {
+            return null;
+        }
+        int experience = prefs.getInt(KEY_EXPERIENCE, -1);
+        int level = prefs.getInt(KEY_LEVEL, 0);
+        if (experience < 0 || level <= 0) {
+            return null;
+        }
+        UserProfileModel cached = new UserProfileModel();
+        cached.username = user.username;
+        cached.experience = experience;
+        cached.level = level;
+        cached.levelProgressExperience = prefs.getInt(KEY_LEVEL_PROGRESS, experience % 200);
+        cached.nextLevelExperience = prefs.getInt(KEY_NEXT_LEVEL, 200);
+        return cached;
+    }
+
+    private void cacheProfile(MainActivity activity, SessionUser user, UserProfileModel data) {
+        if (user == null || data == null || TextUtils.isEmpty(user.username)) {
+            return;
+        }
+        activity.getSharedPreferences(PROFILE_CACHE_PREFS, android.content.Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_USERNAME, user.username)
+                .putInt(KEY_LEVEL, Math.max(1, data.level))
+                .putInt(KEY_EXPERIENCE, Math.max(0, data.experience))
+                .putInt(KEY_LEVEL_PROGRESS, Math.max(0, data.levelProgressExperience))
+                .putInt(KEY_NEXT_LEVEL, Math.max(1, data.nextLevelExperience))
+                .apply();
     }
 
     private String avatarText(String value) {

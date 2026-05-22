@@ -108,9 +108,12 @@ public class ScoreboardOcrOrchestrator {
         for (CropSpec cropSpec : SCOREBOARD_CROPS) {
             Bitmap cropped = crop(source, cropSpec);
             Bitmap enhanced = prepareForOcr(cropped, cropSpec.scale);
+            Bitmap binary = binarizeLightText(cropped, cropSpec.scale);
             ownedBitmaps.add(cropped);
             ownedBitmaps.add(enhanced);
+            ownedBitmaps.add(binary);
             addSectionTasks(cropSpec.label, enhanced, latinRecognizer, chineseRecognizer, pending);
+            addSectionTasks(cropSpec.label + "-binary", binary, latinRecognizer, chineseRecognizer, pending);
         }
     }
 
@@ -185,6 +188,32 @@ public class ScoreboardOcrOrchestrator {
         if (scaled != source) {
             scaled.recycle();
         }
+        return output;
+    }
+
+    private Bitmap binarizeLightText(Bitmap source, int scale) {
+        int safeScale = Math.max(2, scale);
+        Bitmap scaled = Bitmap.createScaledBitmap(source, source.getWidth() * safeScale, source.getHeight() * safeScale, false);
+        Bitmap output = Bitmap.createBitmap(scaled.getWidth(), scaled.getHeight(), Bitmap.Config.ARGB_8888);
+        int width = scaled.getWidth();
+        int height = scaled.getHeight();
+        int[] pixels = new int[width * height];
+        scaled.getPixels(pixels, 0, width, 0, 0, width, height);
+        for (int i = 0; i < pixels.length; i++) {
+            int color = pixels[i];
+            int red = (color >> 16) & 0xff;
+            int green = (color >> 8) & 0xff;
+            int blue = color & 0xff;
+            int max = Math.max(red, Math.max(green, blue));
+            int min = Math.min(red, Math.min(green, blue));
+            int luminance = (red * 299 + green * 587 + blue * 114) / 1000;
+            boolean brightText = luminance >= 148 && max - min <= 95;
+            boolean yellowText = red >= 150 && green >= 120 && blue <= 105;
+            boolean blueWhiteText = blue >= 135 && red >= 105 && green >= 115;
+            pixels[i] = (brightText || yellowText || blueWhiteText) ? 0xff000000 : 0xffffffff;
+        }
+        output.setPixels(pixels, 0, width, 0, 0, width, height);
+        scaled.recycle();
         return output;
     }
 

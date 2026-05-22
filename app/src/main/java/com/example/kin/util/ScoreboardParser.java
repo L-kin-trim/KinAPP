@@ -15,8 +15,10 @@ import java.util.regex.Pattern;
 
 public final class ScoreboardParser {
     private static final Pattern SCORE_PATTERN = Pattern.compile("(\\d{1,2})\\s*[:：\\-]\\s*(\\d{1,2})");
-    private static final Pattern MONEY_PATTERN = Pattern.compile("\\$\\s*([1-9]\\d{2,5})");
+    private static final Pattern MONEY_PATTERN = Pattern.compile("(?i)(?:[$￥¥＄]|\\bS)\\s*([0-9]{1,5})");
+    private static final Pattern ROW_STATS_PATTERN = Pattern.compile("(?i)(.{0,50}?)(?:[$￥¥＄]|\\bS)\\s*([0-9]{1,5})\\s+(\\d{1,2})\\s+(\\d{1,2})\\s+(\\d{1,2})(?:\\s+\\d{1,3})?(?:\\s+\\d{2,5})?");
     private static final Pattern KDA_PATTERN = Pattern.compile("(\\d{1,2})\\s*/\\s*(\\d{1,2})(?:\\s*/\\s*(\\d{1,2}))?");
+    private static final Pattern SMALL_NUMBER_PATTERN = Pattern.compile("\\b(\\d{1,2})\\b");
     private static final Pattern NAME_PATTERN = Pattern.compile("([\\p{L}][\\p{L}0-9_\\-]{1,15})");
 
     private static final Set<String> NAME_STOP_WORDS = new LinkedHashSet<>(Arrays.asList(
@@ -37,22 +39,64 @@ public final class ScoreboardParser {
             return snapshot;
         }
 
-        snapshot.scoreText = parseScore(snapshot.rawText);
-        List<Integer> moneyValues = parseMoneyValues(snapshot.rawText);
-        List<int[]> kdas = parseKdaValues(snapshot.rawText);
-        List<String> usernames = parseUsernames(snapshot.rawText);
+        String scoreSource = firstNonEmpty(
+                sectionText(snapshot.rawText, "left-score-binary"),
+                sectionText(snapshot.rawText, "left-score"),
+                sectionText(snapshot.rawText, "scoreboard-binary"),
+                sectionText(snapshot.rawText, "scoreboard"),
+                withoutSections(snapshot.rawText, "top-hud", "top-hud-binary", "full", "mini-map", "mini-map-binary")
+        );
+        String statsSource = firstNonEmpty(
+                joinSections(snapshot.rawText,
+                        "team-a-rows-binary", "team-b-rows-binary", "stat-columns-binary",
+                        "team-a-rows", "team-b-rows", "stat-columns",
+                        "scoreboard-binary", "scoreboard"),
+                snapshot.rawText
+        );
+        String nameSource = firstNonEmpty(
+                joinSections(snapshot.rawText,
+                        "player-names-binary", "player-names",
+                        "team-a-rows-binary", "team-b-rows-binary", "team-a-rows", "team-b-rows"),
+                statsSource
+        );
+
+        snapshot.scoreText = parseScore(scoreSource);
+        List<ScoreboardSnapshot.PlayerStat> tablePlayers = parsePlayerRows(statsSource);
+        List<Integer> moneyValues = parseMoneyValues(statsSource);
+        List<int[]> kdas = tablePlayers.isEmpty() ? parseKdaValues(statsSource) : kdasFromPlayers(tablePlayers);
+        List<String> usernames = parseUsernames(nameSource);
 
         snapshot.moneyText = formatMoney(moneyValues);
         snapshot.kdaText = formatKda(kdas);
         snapshot.mapName = parseMap(snapshot.rawText);
-        snapshot.players.addAll(buildPlayers(usernames, moneyValues, kdas));
+        if (tablePlayers.isEmpty()) {
+            snapshot.players.addAll(buildPlayers(usernames, moneyValues, kdas));
+        } else {
+            snapshot.players.addAll(tablePlayers);
+        }
         snapshot.playerStatsText = buildPlayerSummary(snapshot.players);
         snapshot.hotHandSummary = summarizeHotHand(snapshot.players);
         return snapshot;
     }
 
     private static String parseScore(String rawText) {
-        Matcher matcher = SCORE_PATTERN.matcher(rawText);
+        String source = cleanOcrText(rawText);
+        String noAlive = source.replaceAll("\\d{1,2}\\s*/\\s*\\d{1,2}(?:\\s*/\\s*\\d{1,2})?", " ");
+        List<Integer> standalone = new ArrayList<>();
+        for (String line : noAlive.split("\\R+")) {
+            String trimmed = line.trim();
+            if (trimmed.matches("\\d{1,2}")) {
+                int value = toInt(trimmed);
+                if (value <= 30) {
+                    standalone.add(value);
+                }
+            }
+        }
+        if (standalone.size() >= 2) {
+            return standalone.get(0) + ":" + standalone.get(1);
+        }
+
+        Matcher matcher = SCORE_PATTERN.matcher(noAlive);
         while (matcher.find()) {
             int left = toInt(matcher.group(1));
             int right = toInt(matcher.group(2));
@@ -60,24 +104,69 @@ public final class ScoreboardParser {
                 return left + ":" + right;
             }
         }
+        List<Integer> numbers = smallNumbers(noAlive);
+        if (numbers.size() >= 2) {
+            return numbers.get(0) + ":" + numbers.get(1);
+        }
         return "";
     }
 
     private static List<Integer> parseMoneyValues(String rawText) {
         LinkedHashSet<Integer> values = new LinkedHashSet<>();
-        Matcher moneyMatcher = MONEY_PATTERN.matcher(rawText);
+        Matcher moneyMatcher = MONEY_PATTERN.matcher(cleanOcrText(rawText));
         while (moneyMatcher.find() && values.size() < 10) {
             int value = toInt(moneyMatcher.group(1));
-            if (value >= 150 && value <= 20000) {
+            if (value >= 0 && value <= 20000) {
                 values.add(value);
             }
         }
         return new ArrayList<>(values);
     }
 
+    private static List<ScoreboardSnapshot.PlayerStat> parsePlayerRows(String rawText) {
+        List<ScoreboardSnapshot.PlayerStat> players = new ArrayList<>();
+        String[] lines = cleanOcrText(rawText).split("\\R+");
+        for (String line : lines) {
+            if (players.size() >= 10) {
+                break;
+            }
+            String normalized = line.replaceAll("\\s+", " ").trim();
+            if (normalized.length() < 8) {
+                continue;
+            }
+            Matcher matcher = ROW_STATS_PATTERN.matcher(normalized);
+            if (!matcher.find()) {
+                continue;
+            }
+            int money = toInt(matcher.group(2));
+            int kills = toInt(matcher.group(3));
+            int deaths = toInt(matcher.group(4));
+            int assists = toInt(matcher.group(5));
+            if (money > 20000 || kills > 40 || deaths > 40 || assists > 40) {
+                continue;
+            }
+            ScoreboardSnapshot.PlayerStat stat = new ScoreboardSnapshot.PlayerStat();
+            stat.username = cleanPlayerName(matcher.group(1), players.size() + 1);
+            stat.money = money;
+            stat.kills = kills;
+            stat.deaths = deaths;
+            stat.assists = assists;
+            players.add(stat);
+        }
+        return players;
+    }
+
+    private static List<int[]> kdasFromPlayers(List<ScoreboardSnapshot.PlayerStat> players) {
+        List<int[]> values = new ArrayList<>();
+        for (ScoreboardSnapshot.PlayerStat player : players) {
+            values.add(new int[]{player.kills, player.deaths, player.assists});
+        }
+        return values;
+    }
+
     private static List<int[]> parseKdaValues(String rawText) {
         List<int[]> values = new ArrayList<>();
-        Matcher matcher = KDA_PATTERN.matcher(rawText);
+        Matcher matcher = KDA_PATTERN.matcher(cleanOcrText(rawText));
         while (matcher.find() && values.size() < 12) {
             int kills = toInt(matcher.group(1));
             int deaths = toInt(matcher.group(2));
@@ -92,7 +181,7 @@ public final class ScoreboardParser {
 
     private static List<String> parseUsernames(String rawText) {
         LinkedHashSet<String> names = new LinkedHashSet<>();
-        Matcher matcher = NAME_PATTERN.matcher(rawText);
+        Matcher matcher = NAME_PATTERN.matcher(cleanOcrText(rawText));
         while (matcher.find() && names.size() < 12) {
             String value = matcher.group(1);
             if (value == null) {
@@ -218,6 +307,103 @@ public final class ScoreboardParser {
             builder.append(kda[0]).append('/').append(kda[1]).append('/').append(kda[2]);
         }
         return builder.toString();
+    }
+
+    private static String sectionText(String rawText, String label) {
+        if (isEmpty(rawText) || isEmpty(label)) {
+            return "";
+        }
+        String startMarker = "[" + label + "]";
+        int start = rawText.indexOf(startMarker);
+        if (start < 0) {
+            return "";
+        }
+        int contentStart = start + startMarker.length();
+        int next = rawText.indexOf("\n[", contentStart);
+        int separator = rawText.indexOf("\n\n-----", contentStart);
+        int end = next < 0 ? rawText.length() : next;
+        if (separator >= 0 && separator < end) {
+            end = separator;
+        }
+        return rawText.substring(contentStart, end).trim();
+    }
+
+    private static String joinSections(String rawText, String... labels) {
+        StringBuilder builder = new StringBuilder();
+        for (String label : labels) {
+            String section = sectionText(rawText, label);
+            if (isEmpty(section)) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append('\n');
+            }
+            builder.append(section);
+        }
+        return builder.toString().trim();
+    }
+
+    private static String withoutSections(String rawText, String... labels) {
+        if (isEmpty(rawText)) {
+            return "";
+        }
+        String result = rawText;
+        for (String label : labels) {
+            result = result.replace(sectionText(rawText, label), "");
+            result = result.replace("[" + label + "]", "");
+        }
+        return result.trim();
+    }
+
+    private static String cleanOcrText(String rawText) {
+        if (rawText == null) {
+            return "";
+        }
+        return rawText
+                .replace('＄', '$')
+                .replace('￥', '$')
+                .replace('¥', '$')
+                .replace('，', ',')
+                .replace('：', ':')
+                .replace('／', '/');
+    }
+
+    private static List<Integer> smallNumbers(String rawText) {
+        List<Integer> values = new ArrayList<>();
+        Matcher matcher = SMALL_NUMBER_PATTERN.matcher(rawText);
+        while (matcher.find() && values.size() < 8) {
+            int value = toInt(matcher.group(1));
+            if (value <= 30) {
+                values.add(value);
+            }
+        }
+        return values;
+    }
+
+    private static String cleanPlayerName(String rawName, int index) {
+        String value = rawName == null ? "" : rawName.replaceAll("[^\\p{L}0-9_\\-\\s]", " ").trim();
+        String[] tokens = value.split("\\s+");
+        for (int i = tokens.length - 1; i >= 0; i--) {
+            String token = tokens[i].trim();
+            if (token.length() < 2 || isNumeric(token)) {
+                continue;
+            }
+            String lower = token.toLowerCase(Locale.ROOT);
+            if (NAME_STOP_WORDS.contains(lower) || MAP_ALIASES.containsKey(lower)) {
+                continue;
+            }
+            return token;
+        }
+        return "玩家" + index;
+    }
+
+    private static String firstNonEmpty(String... values) {
+        for (String value : values) {
+            if (!isEmpty(value)) {
+                return value;
+            }
+        }
+        return "";
     }
 
     private static Map<String, String> createMapAliases() {
