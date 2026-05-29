@@ -26,6 +26,7 @@ import com.example.kin.ui.LibraryFragment;
 import com.example.kin.ui.MessagesActivity;
 import com.example.kin.ui.PostDetailActivity;
 import com.example.kin.ui.ProfileFragment;
+import com.example.kin.ui.PublishEditorActivity;
 import com.example.kin.ui.PublishFragment;
 import com.example.kin.ui.adapter.MainPagerAdapter;
 import com.example.kin.ui.admin.AdminCenterActivity;
@@ -47,6 +48,7 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
     private List<Fragment> rootFragments;
     private boolean autoLoginInFlight;
     private boolean autoCheckInInFlight;
+    private boolean suppressPublishLaunch;
     private GithubReleaseUpdater releaseUpdater;
 
     private final int[] navIds = new int[]{
@@ -113,7 +115,9 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
             @Override
             public void onPageSelected(int position) {
                 if (bottomNavigationView.getSelectedItemId() != navIds[position]) {
+                    suppressPublishLaunch = true;
                     bottomNavigationView.setSelectedItemId(navIds[position]);
+                    suppressPublishLaunch = false;
                 }
                 updateToolbarForPage(position);
             }
@@ -222,12 +226,20 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
     }
 
     public void switchToPublish() {
-        viewPager.setCurrentItem(2, false);
+        openPublishEditor();
+    }
+
+    private void openPublishEditor() {
+        startActivity(new Intent(this, PublishEditorActivity.class));
     }
 
     @Override
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
         int itemId = item.getItemId();
+        if (itemId == R.id.nav_publish && !suppressPublishLaunch) {
+            openPublishEditor();
+            return false;
+        }
         for (int i = 0; i < navIds.length; i++) {
             if (navIds[i] == itemId) {
                 if (viewPager.getCurrentItem() != i) {
