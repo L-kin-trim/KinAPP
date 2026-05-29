@@ -124,6 +124,8 @@ public final class JsonUtils {
         post.withdrawnAt = displayTime(json, "withdrawnAt");
         post.editableUntil = displayTime(json, "editableUntil");
         post.content = optString(json, "content");
+        post.contentFormat = optString(json, "contentFormat");
+        post.markdownContent = optString(json, "markdownContent");
         post.propName = optString(json, "propName");
         post.toolType = optString(json, "toolType");
         post.throwMethod = optString(json, "throwMethod");

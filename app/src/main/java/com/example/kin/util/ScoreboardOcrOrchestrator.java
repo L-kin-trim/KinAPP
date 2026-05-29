@@ -199,6 +199,19 @@ public class ScoreboardOcrOrchestrator {
         int height = scaled.getHeight();
         int[] pixels = new int[width * height];
         scaled.getPixels(pixels, 0, width, 0, 0, width, height);
+
+        // Adaptive threshold: derive the bright-text cutoff from the crop's own
+        // luminance distribution so dark or washed-out screenshots binarize cleanly.
+        long luminanceSum = 0;
+        for (int pixel : pixels) {
+            int red = (pixel >> 16) & 0xff;
+            int green = (pixel >> 8) & 0xff;
+            int blue = pixel & 0xff;
+            luminanceSum += (red * 299 + green * 587 + blue * 114) / 1000;
+        }
+        int meanLuminance = (int) (luminanceSum / Math.max(1, pixels.length));
+        int brightThreshold = clamp(meanLuminance + 28, 130, 200);
+
         for (int i = 0; i < pixels.length; i++) {
             int color = pixels[i];
             int red = (color >> 16) & 0xff;
@@ -207,7 +220,7 @@ public class ScoreboardOcrOrchestrator {
             int max = Math.max(red, Math.max(green, blue));
             int min = Math.min(red, Math.min(green, blue));
             int luminance = (red * 299 + green * 587 + blue * 114) / 1000;
-            boolean brightText = luminance >= 148 && max - min <= 95;
+            boolean brightText = luminance >= brightThreshold && max - min <= 95;
             boolean yellowText = red >= 150 && green >= 120 && blue <= 105;
             boolean blueWhiteText = blue >= 135 && red >= 105 && green >= 115;
             pixels[i] = (brightText || yellowText || blueWhiteText) ? 0xff000000 : 0xffffffff;

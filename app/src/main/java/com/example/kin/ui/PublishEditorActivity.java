@@ -68,6 +68,7 @@ public class PublishEditorActivity extends AppCompatActivity {
     private TextInputEditText tacticNameEdit;
     private TextInputEditText tacticTypeEdit;
     private TextInputEditText tacticDescriptionEdit;
+    private TextInputEditText dailyTitleEdit;
     private TextInputEditText contentEdit;
     private final List<TextInputEditText> memberEdits = new ArrayList<>();
     private final List<TextInputEditText> roleEdits = new ArrayList<>();
@@ -266,7 +267,13 @@ public class PublishEditorActivity extends AppCompatActivity {
         }
 
         dailySection = KinUi.vertical(this);
-        contentEdit = addInput(dailySection, "内容", true);
+        dailyTitleEdit = addInput(dailySection, "填写标题（必填）", false);
+        TextView markdownHint = KinUi.muted(this,
+                "正文支持 Markdown：# 标题、**加粗**、- 列表、> 引用、`代码`、[链接](https://...)。",
+                13);
+        KinUi.margins(markdownHint, this, 0, 10, 0, 0);
+        dailySection.addView(markdownHint);
+        contentEdit = addInput(dailySection, "添加正文（支持 Markdown）", true);
         galleryState = imageRow(dailySection, "图片上传（最多 10 张）", () -> galleryPicker.launch("image/*"));
 
         body.addView(propSection);
@@ -351,6 +358,7 @@ public class PublishEditorActivity extends AppCompatActivity {
             tacticNameEdit.setText(payload.optString("tacticName"));
             tacticTypeEdit.setText(payload.optString("tacticType"));
             tacticDescriptionEdit.setText(payload.optString("tacticDescription"));
+            dailyTitleEdit.setText(payload.optString("title"));
             contentEdit.setText(payload.optString("content"));
             for (int i = 0; i < 5; i++) {
                 memberEdits.get(i).setText(payload.optString("member" + (i + 1)));
@@ -488,6 +496,14 @@ public class PublishEditorActivity extends AppCompatActivity {
     }
 
     private void submitDailyPost() {
+        if (TextUtils.isEmpty(text(dailyTitleEdit))) {
+            setLoading(false, "请先填写标题。");
+            return;
+        }
+        if (TextUtils.isEmpty(text(contentEdit))) {
+            setLoading(false, "请先填写正文。");
+            return;
+        }
         if (galleryUris.isEmpty()) {
             createPost(buildPayload());
             return;
@@ -560,7 +576,10 @@ public class PublishEditorActivity extends AppCompatActivity {
                     payload.put("member" + (i + 1) + "Role", text(roleEdits.get(i)));
                 }
             } else {
+                payload.put("title", text(dailyTitleEdit));
                 payload.put("content", text(contentEdit));
+                payload.put("contentFormat", "MARKDOWN");
+                payload.put("markdownContent", text(contentEdit));
                 payload.put("imageUrls", new JSONArray());
             }
         } catch (Exception ignored) {
@@ -575,7 +594,7 @@ public class PublishEditorActivity extends AppCompatActivity {
         if ("TACTIC_SHARE".equals(currentType)) {
             return emptyFallback(text(tacticNameEdit), "战术分享草稿");
         }
-        return emptyFallback(text(contentEdit), "日常闲聊草稿");
+        return emptyFallback(text(dailyTitleEdit), emptyFallback(text(contentEdit), "日常闲聊草稿"));
     }
 
     private void setLoading(boolean loading, String message) {

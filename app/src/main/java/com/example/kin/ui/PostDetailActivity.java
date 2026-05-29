@@ -40,6 +40,8 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
+import io.noties.markwon.Markwon;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -325,6 +327,9 @@ public class PostDetailActivity extends AppCompatActivity {
         TextView summary = KinUi.text(this, buildSummary(), 17, false);
         summary.setLineSpacing(KinUi.dp(this, 4), 1f);
         KinUi.margins(summary, this, 0, 12, 0, 0);
+        if (isDailyMarkdown(currentPost)) {
+            Markwon.create(this).setMarkdown(summary, markdownSource(currentPost));
+        }
         body.addView(summary);
 
         TextView meta = KinUi.muted(this, buildMeta(), 13);
@@ -972,10 +977,11 @@ public class PostDetailActivity extends AppCompatActivity {
             edit2.setText(currentPost.tacticType);
             edit3.setText(currentPost.tacticDescription);
         } else {
-            field1.setHint("正文内容");
-            edit1.setText(currentPost.content);
+            field1.setHint("标题");
+            edit1.setText(currentPost.title);
             field2.setVisibility(View.GONE);
-            field3.setVisibility(View.GONE);
+            field3.setHint("正文（支持 Markdown）");
+            edit3.setText(markdownSource(currentPost));
         }
 
         new AlertDialog.Builder(this)
@@ -1015,7 +1021,10 @@ public class PostDetailActivity extends AppCompatActivity {
                 payload.put("member5", currentPost.member5);
                 payload.put("member5Role", currentPost.member5Role);
             } else {
-                payload.put("content", text(edit1));
+                payload.put("title", text(edit1));
+                payload.put("content", text(edit3));
+                payload.put("contentFormat", "MARKDOWN");
+                payload.put("markdownContent", text(edit3));
                 payload.put("imageUrls", new JSONArray(currentPost.imageUrls));
             }
             repository.updatePost(postId, payload, new ApiCallback<>() {
@@ -1058,6 +1067,21 @@ public class PostDetailActivity extends AppCompatActivity {
                     + "\n" + safeText(currentPost.tacticDescription, "");
         }
         return safeText(currentPost.content, "暂无正文");
+    }
+
+    private boolean isDailyMarkdown(ForumPostModel post) {
+        if (post == null) {
+            return false;
+        }
+        boolean dailyType = "DAILY_CHAT".equals(post.postType) || "OTHER".equals(post.postType);
+        return dailyType && "MARKDOWN".equalsIgnoreCase(post.contentFormat) && !TextUtils.isEmpty(markdownSource(post));
+    }
+
+    private String markdownSource(ForumPostModel post) {
+        if (post == null) {
+            return "";
+        }
+        return TextUtils.isEmpty(post.markdownContent) ? safeText(post.content, "") : post.markdownContent;
     }
 
     private String buildMeta() {

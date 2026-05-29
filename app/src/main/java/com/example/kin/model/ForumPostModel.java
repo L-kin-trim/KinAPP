@@ -19,6 +19,8 @@ public class ForumPostModel {
     public String withdrawnAt;
     public String editableUntil;
     public String content;
+    public String contentFormat;
+    public String markdownContent;
     public String propName;
     public String toolType;
     public String throwMethod;

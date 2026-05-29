@@ -98,11 +98,17 @@ public final class ScoreboardParser {
 
         Matcher matcher = SCORE_PATTERN.matcher(noAlive);
         while (matcher.find()) {
+            String rightRaw = matcher.group(2);
             int left = toInt(matcher.group(1));
-            int right = toInt(matcher.group(2));
-            if (left <= 30 && right <= 30) {
-                return left + ":" + right;
+            int right = toInt(rightRaw);
+            if (left > 30 || right > 30) {
+                continue;
             }
+            // Reject clock/timer like 0:03 or 1:09 where the seconds use a leading zero.
+            if (rightRaw != null && rightRaw.length() == 2 && rightRaw.charAt(0) == '0') {
+                continue;
+            }
+            return left + ":" + right;
         }
         List<Integer> numbers = smallNumbers(noAlive);
         if (numbers.size() >= 2) {

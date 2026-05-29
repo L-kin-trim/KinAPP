@@ -28,6 +28,20 @@ public class ScoreboardParserTest {
     }
 
     @Test
+    public void parse_shouldIgnoreCountdownTimerAsScore() {
+        String raw = "[left-score]\n13\n7\n[top-hud]\n0:03";
+        ScoreboardSnapshot snapshot = ScoreboardParser.parse(raw);
+        assertEquals("13:7", snapshot.scoreText);
+    }
+
+    @Test
+    public void parse_shouldNotReadLeadingZeroSecondsAsScore() {
+        String raw = "Round timer 1:09 then 9:12 final";
+        ScoreboardSnapshot snapshot = ScoreboardParser.parse(raw);
+        assertEquals("9:12", snapshot.scoreText);
+    }
+
+    @Test
     public void parse_shouldHandleEmptyInput() {
         ScoreboardSnapshot snapshot = ScoreboardParser.parse("");
         assertEquals("", snapshot.scoreText);
