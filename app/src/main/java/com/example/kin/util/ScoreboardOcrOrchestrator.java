@@ -26,15 +26,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ScoreboardOcrOrchestrator {
+    // Fractions tuned for the centered 16:9 CS2 scoreboard panel. Columns are
+    // fixed (金钱 杀敌 死亡 助攻 爆% 伤害); the two big numbers on the left are the
+    // team scores. Each team has exactly five rows.
     private static final CropSpec[] SCOREBOARD_CROPS = new CropSpec[]{
-            new CropSpec("top-hud", 0.32f, 0.00f, 0.70f, 0.18f, 3),
-            new CropSpec("scoreboard", 0.25f, 0.25f, 0.76f, 0.82f, 2),
-            new CropSpec("team-a-rows", 0.31f, 0.34f, 0.72f, 0.52f, 3),
-            new CropSpec("team-b-rows", 0.31f, 0.58f, 0.72f, 0.76f, 3),
-            new CropSpec("player-names", 0.35f, 0.34f, 0.55f, 0.76f, 3),
-            new CropSpec("stat-columns", 0.54f, 0.34f, 0.72f, 0.76f, 3),
-            new CropSpec("left-score", 0.25f, 0.37f, 0.34f, 0.75f, 3),
-            new CropSpec("mini-map", 0.00f, 0.00f, 0.19f, 0.30f, 2)
+            new CropSpec("map-title", 0.27f, 0.295f, 0.55f, 0.345f, 2),
+            new CropSpec("score-a", 0.25f, 0.37f, 0.32f, 0.445f, 4),
+            new CropSpec("score-b", 0.25f, 0.585f, 0.32f, 0.665f, 4),
+            new CropSpec("team-a-rows", 0.335f, 0.36f, 0.748f, 0.52f, 3),
+            new CropSpec("team-b-rows", 0.335f, 0.58f, 0.748f, 0.74f, 3),
+            new CropSpec("scoreboard", 0.25f, 0.28f, 0.75f, 0.74f, 2)
     };
 
     public interface Callback {

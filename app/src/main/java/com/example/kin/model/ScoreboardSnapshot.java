@@ -35,14 +35,26 @@ public class ScoreboardSnapshot {
         public int kills;
         public int deaths;
         public int assists;
+        public int headshotPercent = -1;
+        public int damage = -1;
 
         public double kdRatio() {
             return deaths <= 0 ? kills : (kills * 1.0d / deaths);
         }
 
         public String pretty() {
-            String moneyText = money > 0 ? ("$" + money) : "未知";
-            return username + " K/D/A " + kills + "/" + deaths + "/" + assists + " | " + moneyText;
+            StringBuilder builder = new StringBuilder();
+            builder.append(username)
+                    .append(" K/D/A ")
+                    .append(kills).append('/').append(deaths).append('/').append(assists);
+            if (damage >= 0) {
+                builder.append(" | 伤害 ").append(damage);
+            }
+            if (headshotPercent >= 0) {
+                builder.append(" | 爆头 ").append(headshotPercent).append('%');
+            }
+            builder.append(" | ").append(money > 0 ? ("$" + money) : "未知");
+            return builder.toString();
         }
     }
 }

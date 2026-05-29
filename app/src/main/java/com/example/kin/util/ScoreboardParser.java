@@ -39,44 +39,187 @@ public final class ScoreboardParser {
             return snapshot;
         }
 
-        String scoreSource = firstNonEmpty(
-                sectionText(snapshot.rawText, "left-score-binary"),
-                sectionText(snapshot.rawText, "left-score"),
-                sectionText(snapshot.rawText, "scoreboard-binary"),
-                sectionText(snapshot.rawText, "scoreboard"),
-                withoutSections(snapshot.rawText, "top-hud", "top-hud-binary", "full", "mini-map", "mini-map-binary")
-        );
-        String statsSource = firstNonEmpty(
-                joinSections(snapshot.rawText,
-                        "team-a-rows-binary", "team-b-rows-binary", "stat-columns-binary",
-                        "team-a-rows", "team-b-rows", "stat-columns",
-                        "scoreboard-binary", "scoreboard"),
-                snapshot.rawText
-        );
-        String nameSource = firstNonEmpty(
-                joinSections(snapshot.rawText,
-                        "player-names-binary", "player-names",
-                        "team-a-rows-binary", "team-b-rows-binary", "team-a-rows", "team-b-rows"),
-                statsSource
-        );
-
-        snapshot.scoreText = parseScore(scoreSource);
-        List<ScoreboardSnapshot.PlayerStat> tablePlayers = parsePlayerRows(statsSource);
-        List<Integer> moneyValues = parseMoneyValues(statsSource);
-        List<int[]> kdas = tablePlayers.isEmpty() ? parseKdaValues(statsSource) : kdasFromPlayers(tablePlayers);
-        List<String> usernames = parseUsernames(nameSource);
-
-        snapshot.moneyText = formatMoney(moneyValues);
-        snapshot.kdaText = formatKda(kdas);
-        snapshot.mapName = parseMap(snapshot.rawText);
-        if (tablePlayers.isEmpty()) {
-            snapshot.players.addAll(buildPlayers(usernames, moneyValues, kdas));
+        // 1. Score: prefer the two dedicated big-number crops on the left of each
+        //    team block; fall back to scanning the whole text.
+        String teamScore = parseTeamScore(snapshot.rawText);
+        if (!isEmpty(teamScore)) {
+            snapshot.scoreText = teamScore;
         } else {
-            snapshot.players.addAll(tablePlayers);
+            String scoreSource = firstNonEmpty(
+                    sectionText(snapshot.rawText, "scoreboard-binary"),
+                    sectionText(snapshot.rawText, "scoreboard"),
+                    snapshot.rawText
+            );
+            snapshot.scoreText = parseScore(scoreSource);
         }
+
+        // 2. Player rows: parse each team's fixed five rows. The last five numbers
+        //    on a row are always 杀敌/死亡/助攻/爆%/伤害; an extra leading number is
+        //    money (only shown for the viewer's own team).
+        List<ScoreboardSnapshot.PlayerStat> binaryRows = parseCs2Rows(
+                joinSections(snapshot.rawText, "team-a-rows-binary", "team-b-rows-binary"));
+        List<ScoreboardSnapshot.PlayerStat> plainRows = parseCs2Rows(
+                joinSections(snapshot.rawText, "team-a-rows", "team-b-rows"));
+        List<ScoreboardSnapshot.PlayerStat> tablePlayers = chooseBetterRows(binaryRows, plainRows);
+
+        snapshot.mapName = parseMap(snapshot.rawText);
+
+        if (!tablePlayers.isEmpty()) {
+            snapshot.players.addAll(tablePlayers);
+            snapshot.moneyText = formatMoney(moneyFromPlayers(tablePlayers));
+            snapshot.kdaText = formatKda(kdasFromPlayers(tablePlayers));
+        } else {
+            // Fallback for free-form text without fixed-layout sections.
+            String statsSource = firstNonEmpty(
+                    sectionText(snapshot.rawText, "scoreboard-binary"),
+                    sectionText(snapshot.rawText, "scoreboard"),
+                    snapshot.rawText);
+            List<ScoreboardSnapshot.PlayerStat> rowPlayers = parsePlayerRows(statsSource);
+            List<Integer> moneyValues = parseMoneyValues(statsSource);
+            List<int[]> kdas = rowPlayers.isEmpty() ? parseKdaValues(statsSource) : kdasFromPlayers(rowPlayers);
+            List<String> usernames = parseUsernames(statsSource);
+            snapshot.moneyText = formatMoney(moneyValues);
+            snapshot.kdaText = formatKda(kdas);
+            if (rowPlayers.isEmpty()) {
+                snapshot.players.addAll(buildPlayers(usernames, moneyValues, kdas));
+            } else {
+                snapshot.players.addAll(rowPlayers);
+            }
+        }
+
         snapshot.playerStatsText = buildPlayerSummary(snapshot.players);
         snapshot.hotHandSummary = summarizeHotHand(snapshot.players);
         return snapshot;
+    }
+
+    /**
+     * Reads the two big team-score numbers from their dedicated crops and joins
+     * them as "A:B". Returns empty when either crop produced no usable digit.
+     */
+    private static String parseTeamScore(String rawText) {
+        String left = firstStandaloneScore(joinSections(rawText, "score-a-binary", "score-a"));
+        String right = firstStandaloneScore(joinSections(rawText, "score-b-binary", "score-b"));
+        if (left == null || right == null) {
+            return "";
+        }
+        return left + ":" + right;
+    }
+
+    private static String firstStandaloneScore(String text) {
+        if (isEmpty(text)) {
+            return null;
+        }
+        Matcher matcher = SMALL_NUMBER_PATTERN.matcher(cleanOcrText(text));
+        while (matcher.find()) {
+            int value = toInt(matcher.group(1));
+            if (value >= 0 && value <= 30) {
+                return String.valueOf(value);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Parses CS2 scoreboard rows. For each line the trailing run of integer
+     * tokens is the stat tail; the last five are 杀敌/死亡/助攻/爆%/伤害 and a
+     * sixth (leading) token, when present, is money. This is robust to player
+     * names that contain digits because only the trailing numbers are used.
+     */
+    private static List<ScoreboardSnapshot.PlayerStat> parseCs2Rows(String rawText) {
+        List<ScoreboardSnapshot.PlayerStat> players = new ArrayList<>();
+        if (isEmpty(rawText)) {
+            return players;
+        }
+        for (String line : cleanOcrText(rawText).split("\\R+")) {
+            if (players.size() >= 10) {
+                break;
+            }
+            String normalized = line.replaceAll("\\s+", " ").trim();
+            if (normalized.isEmpty()) {
+                continue;
+            }
+            String[] tokens = normalized.split(" ");
+            List<Integer> tail = new ArrayList<>();
+            int index = tokens.length - 1;
+            while (index >= 0 && isStatToken(tokens[index])) {
+                tail.add(0, statTokenValue(tokens[index]));
+                index--;
+            }
+            if (tail.size() < 5) {
+                continue;
+            }
+            int n = tail.size();
+            int kills = tail.get(n - 5);
+            int deaths = tail.get(n - 4);
+            int assists = tail.get(n - 3);
+            int headshot = tail.get(n - 2);
+            int damage = tail.get(n - 1);
+            if (kills > 60 || deaths > 60 || assists > 60 || headshot > 100 || damage > 9999) {
+                continue;
+            }
+            ScoreboardSnapshot.PlayerStat stat = new ScoreboardSnapshot.PlayerStat();
+            StringBuilder name = new StringBuilder();
+            for (int i = 0; i <= index; i++) {
+                if (name.length() > 0) {
+                    name.append(' ');
+                }
+                name.append(tokens[i]);
+            }
+            stat.username = name.length() == 0 ? ("玩家" + (players.size() + 1)) : name.toString().trim();
+            stat.kills = kills;
+            stat.deaths = deaths;
+            stat.assists = assists;
+            stat.headshotPercent = headshot;
+            stat.damage = damage;
+            int money = n >= 6 ? tail.get(n - 6) : 0;
+            stat.money = money > 16000 ? 0 : money;
+            players.add(stat);
+        }
+        return players;
+    }
+
+    /**
+     * Picks the OCR pass (binarized vs. enhanced) that produced the more
+     * complete set of rows: more players first, then more recognised names.
+     */
+    private static List<ScoreboardSnapshot.PlayerStat> chooseBetterRows(
+            List<ScoreboardSnapshot.PlayerStat> first,
+            List<ScoreboardSnapshot.PlayerStat> second) {
+        if (first.size() != second.size()) {
+            return first.size() > second.size() ? first : second;
+        }
+        return namedCount(first) >= namedCount(second) ? first : second;
+    }
+
+    private static int namedCount(List<ScoreboardSnapshot.PlayerStat> players) {
+        int count = 0;
+        for (ScoreboardSnapshot.PlayerStat player : players) {
+            if (!isEmpty(player.username) && !player.username.startsWith("玩家")) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static boolean isStatToken(String token) {
+        if (token == null) {
+            return false;
+        }
+        return token.matches("\\$?\\d{1,5}");
+    }
+
+    private static int statTokenValue(String token) {
+        return toInt(token.replaceAll("[^0-9]", ""));
+    }
+
+    private static List<Integer> moneyFromPlayers(List<ScoreboardSnapshot.PlayerStat> players) {
+        List<Integer> values = new ArrayList<>();
+        for (ScoreboardSnapshot.PlayerStat player : players) {
+            if (player.money > 0) {
+                values.add(player.money);
+            }
+        }
+        return values;
     }
 
     private static String parseScore(String rawText) {
