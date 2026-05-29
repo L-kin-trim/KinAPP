@@ -53,7 +53,6 @@ public class AiRecommendFragment extends BasePageFragment {
     private TextView imageState;
     private ImageView imagePreview;
     private TextView rawOcrView;
-    private TextView structuredView;
     private TextView streamStatus;
     private TextView outputView;
     private MaterialButton startButton;
@@ -184,15 +183,6 @@ public class AiRecommendFragment extends BasePageFragment {
         kdaEdit = addInput(body, "K/D/A \u6458\u8981", false);
         noteEdit = addInput(body, "\u8865\u5145\u4e0a\u4e0b\u6587\uff08\u53ef\u9009\uff09", true);
 
-        TextView structuredTitle = KinUi.muted(activity, "\u7ed3\u6784\u5316\u6458\u8981", 13);
-        KinUi.margins(structuredTitle, activity, 0, 12, 0, 0);
-        body.addView(structuredTitle);
-
-        structuredView = KinUi.muted(activity, "", 13);
-        structuredView.setVisibility(View.GONE);
-        KinUi.margins(structuredView, activity, 0, 6, 0, 0);
-        body.addView(structuredView);
-
         TextView rawTitle = KinUi.muted(activity, "OCR \u539f\u6587", 13);
         KinUi.margins(rawTitle, activity, 0, 12, 0, 0);
         body.addView(rawTitle);
@@ -284,10 +274,6 @@ public class AiRecommendFragment extends BasePageFragment {
                 kdaEdit.setText(snapshot.kdaText);
                 rawOcrView.setText(snapshot.rawText);
                 rawOcrView.setVisibility(TextUtils.isEmpty(snapshot.rawText) ? View.GONE : View.VISIBLE);
-
-                String structured = buildStructuredText(snapshot);
-                structuredView.setText(structured);
-                structuredView.setVisibility(TextUtils.isEmpty(structured) ? View.GONE : View.VISIBLE);
                 setLoading(false, "OCR \u5b8c\u6210\uff0c\u8bf7\u786e\u8ba4\u540e\u5f00\u59cb AI \u5206\u6790\u3002");
             }
 
@@ -373,23 +359,6 @@ public class AiRecommendFragment extends BasePageFragment {
             snapshot.chineseRawText = lastOcrSnapshot.chineseRawText;
         }
         return snapshot;
-    }
-
-    private String buildStructuredText(ScoreboardSnapshot snapshot) {
-        StringBuilder builder = new StringBuilder();
-        if (!TextUtils.isEmpty(snapshot.mapName)) {
-            builder.append("\u5730\u56fe\uff1a").append(snapshot.mapName).append('\n');
-        }
-        if (!TextUtils.isEmpty(snapshot.scoreText)) {
-            builder.append("\u6bd4\u5206\uff1a").append(snapshot.scoreText).append('\n');
-        }
-        if (!TextUtils.isEmpty(snapshot.playerStatsText)) {
-            builder.append("\u73a9\u5bb6\u7edf\u8ba1\uff1a\n").append(snapshot.playerStatsText).append('\n');
-        }
-        if (!TextUtils.isEmpty(snapshot.hotHandSummary)) {
-            builder.append("\u624b\u611f\u5019\u9009\uff1a").append(snapshot.hotHandSummary).append('\n');
-        }
-        return builder.toString().trim();
     }
 
     private void loadLibraryContext(ScoreboardSnapshot snapshot, LibraryContextCallback callback) {

@@ -2,11 +2,8 @@ package com.example.kin.util;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.ColorMatrix;
-import android.graphics.ColorMatrixColorFilter;
 import android.graphics.ImageDecoder;
-import android.graphics.Paint;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.MediaStore;
@@ -23,20 +20,19 @@ import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions;
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
+/**
+ * Layout-agnostic scoreboard OCR. Instead of cropping fixed fractions of a
+ * fixed 16:9 layout, this reconstructs the scoreboard table from ML Kit element
+ * bounding boxes: elements are clustered into rows by vertical position and
+ * sorted left-to-right inside each row, so the true reading order of every row
+ * is recovered regardless of where the panel sits in the screenshot. The two
+ * big team-score digits are detected by font height. The result is emitted as
+ * the labelled section text that {@link ScoreboardParser} already parses.
+ */
 public class ScoreboardOcrOrchestrator {
-    // Fractions tuned for the centered 16:9 CS2 scoreboard panel. Columns are
-    // fixed (金钱 杀敌 死亡 助攻 爆% 伤害); the two big numbers on the left are the
-    // team scores. Each team has exactly five rows.
-    private static final CropSpec[] SCOREBOARD_CROPS = new CropSpec[]{
-            new CropSpec("map-title", 0.27f, 0.295f, 0.55f, 0.345f, 2),
-            new CropSpec("score-a", 0.25f, 0.37f, 0.32f, 0.445f, 4),
-            new CropSpec("score-b", 0.25f, 0.585f, 0.32f, 0.665f, 4),
-            new CropSpec("team-a-rows", 0.335f, 0.36f, 0.748f, 0.52f, 3),
-            new CropSpec("team-b-rows", 0.335f, 0.58f, 0.748f, 0.74f, 3),
-            new CropSpec("scoreboard", 0.25f, 0.28f, 0.75f, 0.74f, 2)
-    };
 
     public interface Callback {
         void onSuccess(ScoreboardSnapshot snapshot);
@@ -48,34 +44,49 @@ public class ScoreboardOcrOrchestrator {
         TextRecognizer latinRecognizer = null;
         TextRecognizer chineseRecognizer = null;
         try {
-            Bitmap sourceBitmap = loadBitmap(context, imageUri);
+            Bitmap source = loadBitmap(context, imageUri);
+            Bitmap ocrBitmap = maybeUpscale(source);
+            int width = ocrBitmap.getWidth();
+
             latinRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
             chineseRecognizer = TextRecognition.getClient(new ChineseTextRecognizerOptions.Builder().build());
 
-            List<Bitmap> ownedBitmaps = new ArrayList<>();
-            List<PendingRecognition> pending = new ArrayList<>();
-            addRecognitionTasks(sourceBitmap, latinRecognizer, chineseRecognizer, ownedBitmaps, pending);
+            InputImage image = InputImage.fromBitmap(ocrBitmap, 0);
+            Task<Text> chineseTask = chineseRecognizer.process(image);
+            Task<Text> latinTask = latinRecognizer.process(image);
 
-            TextRecognizer finalLatinRecognizer = latinRecognizer;
-            TextRecognizer finalChineseRecognizer = chineseRecognizer;
-            Tasks.whenAllComplete(tasksFrom(pending))
-                    .addOnCompleteListener(task -> {
-                        String latinText = collectText(pending, "latin", false);
-                        String chineseText = collectText(pending, "chinese", false);
-                        String plainText = mergeTexts(latinText, chineseText);
-                        if (TextUtils.isEmpty(plainText)) {
-                            callback.onError("OCR did not find readable scoreboard text.");
-                        } else {
-                            ScoreboardSnapshot snapshot = ScoreboardParser.parse(plainText);
-                            snapshot.latinRawText = collectText(pending, "latin", true);
-                            snapshot.chineseRawText = collectText(pending, "chinese", true);
-                            snapshot.rawText = mergeTexts(snapshot.latinRawText, snapshot.chineseRawText);
-                            callback.onSuccess(snapshot);
-                        }
-                        recycleAll(ownedBitmaps);
-                        finalLatinRecognizer.close();
-                        finalChineseRecognizer.close();
-                    });
+            TextRecognizer finalLatin = latinRecognizer;
+            TextRecognizer finalChinese = chineseRecognizer;
+            Tasks.whenAllComplete(chineseTask, latinTask).addOnCompleteListener(task -> {
+                try {
+                    Text chineseResult = resultOf(chineseTask);
+                    Text latinResult = resultOf(latinTask);
+
+                    List<Element> chineseElements = collectElements(chineseResult);
+                    List<Element> latinElements = collectElements(latinResult);
+                    if (chineseElements.isEmpty() && latinElements.isEmpty()) {
+                        callback.onError("OCR did not find readable scoreboard text.");
+                        return;
+                    }
+
+                    String labeled = buildLabeledText(chineseResult, latinResult,
+                            chineseElements, latinElements, width);
+                    ScoreboardSnapshot snapshot = ScoreboardParser.parse(labeled);
+                    snapshot.chineseRawText = textOf(chineseResult);
+                    snapshot.latinRawText = textOf(latinResult);
+                    snapshot.rawText = buildReadableRaw(snapshot, reconstructRows(chineseElements));
+                    callback.onSuccess(snapshot);
+                } finally {
+                    if (ocrBitmap != source && !ocrBitmap.isRecycled()) {
+                        ocrBitmap.recycle();
+                    }
+                    if (!source.isRecycled()) {
+                        source.recycle();
+                    }
+                    finalLatin.close();
+                    finalChinese.close();
+                }
+            });
         } catch (Exception exception) {
             if (latinRecognizer != null) {
                 latinRecognizer.close();
@@ -96,205 +107,188 @@ public class ScoreboardOcrOrchestrator {
         return MediaStore.Images.Media.getBitmap(context.getContentResolver(), imageUri);
     }
 
-    private void addRecognitionTasks(Bitmap source,
-                                     TextRecognizer latinRecognizer,
-                                     TextRecognizer chineseRecognizer,
-                                     List<Bitmap> ownedBitmaps,
-                                     List<PendingRecognition> pending) {
-        Bitmap fullImage = prepareForOcr(source, 1);
-        ownedBitmaps.add(source);
-        ownedBitmaps.add(fullImage);
-        addSectionTasks("full", fullImage, latinRecognizer, chineseRecognizer, pending);
-
-        for (CropSpec cropSpec : SCOREBOARD_CROPS) {
-            Bitmap cropped = crop(source, cropSpec);
-            Bitmap enhanced = prepareForOcr(cropped, cropSpec.scale);
-            Bitmap binary = binarizeLightText(cropped, cropSpec.scale);
-            ownedBitmaps.add(cropped);
-            ownedBitmaps.add(enhanced);
-            ownedBitmaps.add(binary);
-            addSectionTasks(cropSpec.label, enhanced, latinRecognizer, chineseRecognizer, pending);
-            addSectionTasks(cropSpec.label + "-binary", binary, latinRecognizer, chineseRecognizer, pending);
+    // Small screenshots (phone-captured) carry tiny scoreboard text; upscale so
+    // ML Kit reads the digits more reliably. Large captures are used as-is.
+    private Bitmap maybeUpscale(Bitmap source) {
+        int width = source.getWidth();
+        if (width >= 1600) {
+            return source;
         }
+        return Bitmap.createScaledBitmap(source, width * 2, source.getHeight() * 2, true);
     }
 
-    private void addSectionTasks(String section,
-                                 Bitmap bitmap,
-                                 TextRecognizer latinRecognizer,
-                                 TextRecognizer chineseRecognizer,
-                                 List<PendingRecognition> pending) {
-        InputImage image = InputImage.fromBitmap(bitmap, 0);
-        pending.add(new PendingRecognition(section, "latin", latinRecognizer.process(image)));
-        pending.add(new PendingRecognition(section, "chinese", chineseRecognizer.process(image)));
-    }
-
-    private List<Task<?>> tasksFrom(List<PendingRecognition> pending) {
-        List<Task<?>> tasks = new ArrayList<>();
-        for (PendingRecognition recognition : pending) {
-            tasks.add(recognition.task);
+    private List<Element> collectElements(Text text) {
+        List<Element> elements = new ArrayList<>();
+        if (text == null) {
+            return elements;
         }
-        return tasks;
+        for (Text.TextBlock block : text.getTextBlocks()) {
+            for (Text.Line line : block.getLines()) {
+                for (Text.Element element : line.getElements()) {
+                    Rect box = element.getBoundingBox();
+                    String value = element.getText();
+                    if (box == null || value == null) {
+                        continue;
+                    }
+                    String trimmed = value.trim();
+                    if (trimmed.isEmpty()) {
+                        continue;
+                    }
+                    elements.add(new Element(trimmed, box.centerX(), box.centerY(), box.height()));
+                }
+            }
+        }
+        return elements;
     }
 
-    private String collectText(List<PendingRecognition> pending, String language, boolean labeled) {
+    /**
+     * Clusters elements into rows by vertical proximity, then orders each row
+     * left-to-right and joins the element texts with spaces.
+     */
+    private List<String> reconstructRows(List<Element> elements) {
+        List<String> rows = new ArrayList<>();
+        if (elements.isEmpty()) {
+            return rows;
+        }
+        List<Element> sorted = new ArrayList<>(elements);
+        sorted.sort((a, b) -> Integer.compare(a.centerY, b.centerY));
+        int medianHeight = medianHeight(sorted);
+        int tolerance = Math.max(8, Math.round(medianHeight * 0.7f));
+
+        List<Element> current = new ArrayList<>();
+        int lastCenterY = Integer.MIN_VALUE;
+        for (Element element : sorted) {
+            if (current.isEmpty() || element.centerY - lastCenterY <= tolerance) {
+                current.add(element);
+            } else {
+                rows.add(joinRow(current));
+                current = new ArrayList<>();
+                current.add(element);
+            }
+            lastCenterY = element.centerY;
+        }
+        if (!current.isEmpty()) {
+            rows.add(joinRow(current));
+        }
+        return rows;
+    }
+
+    private String joinRow(List<Element> row) {
+        row.sort((a, b) -> Integer.compare(a.centerX, b.centerX));
         StringBuilder builder = new StringBuilder();
-        for (PendingRecognition recognition : pending) {
-            if (!language.equals(recognition.language)) {
-                continue;
-            }
-            String text = readTaskText(recognition.task);
-            if (TextUtils.isEmpty(text)) {
-                continue;
-            }
+        for (Element element : row) {
             if (builder.length() > 0) {
-                builder.append("\n\n");
+                builder.append(' ');
             }
-            if (labeled) {
-                builder.append('[').append(recognition.section).append("]\n");
+            builder.append(element.text);
+        }
+        return builder.toString();
+    }
+
+    /**
+     * The two team scores are by far the tallest digits on the panel and sit on
+     * its left edge. Returns {top, bottom} or null when not confidently found.
+     */
+    private String[] detectScore(List<Element> elements, int width) {
+        if (elements.isEmpty()) {
+            return null;
+        }
+        int medianHeight = medianHeight(elements);
+        List<Element> candidates = new ArrayList<>();
+        for (Element element : elements) {
+            if (!element.text.matches("\\d{1,2}")) {
+                continue;
             }
-            builder.append(text);
+            int value = Integer.parseInt(element.text);
+            if (value > 30) {
+                continue;
+            }
+            if (element.height >= medianHeight * 1.6f && element.centerX < width * 0.45f) {
+                candidates.add(element);
+            }
+        }
+        if (candidates.size() < 2) {
+            return null;
+        }
+        candidates.sort((a, b) -> Integer.compare(a.centerY, b.centerY));
+        return new String[]{candidates.get(0).text, candidates.get(1).text};
+    }
+
+    private int medianHeight(List<Element> elements) {
+        List<Integer> heights = new ArrayList<>();
+        for (Element element : elements) {
+            heights.add(element.height);
+        }
+        Collections.sort(heights);
+        if (heights.isEmpty()) {
+            return 1;
+        }
+        return Math.max(1, heights.get(heights.size() / 2));
+    }
+
+    private String buildLabeledText(Text chineseResult,
+                                    Text latinResult,
+                                    List<Element> chineseElements,
+                                    List<Element> latinElements,
+                                    int width) {
+        List<String> chineseRows = reconstructRows(chineseElements);
+        List<String> latinRows = reconstructRows(latinElements);
+        String[] score = detectScore(chineseElements, width);
+        if (score == null) {
+            score = detectScore(latinElements, width);
+        }
+
+        StringBuilder builder = new StringBuilder();
+        // Full Chinese text feeds map-name detection (which scans the whole input).
+        builder.append("[ocr-full]\n").append(textOf(chineseResult)).append("\n\n");
+        if (score != null) {
+            builder.append("[score-a]\n").append(score[0]).append("\n\n");
+            builder.append("[score-b]\n").append(score[1]).append("\n\n");
+        }
+        builder.append("[team-a-rows]\n").append(TextUtils.join("\n", chineseRows)).append("\n\n");
+        builder.append("[team-a-rows-binary]\n").append(TextUtils.join("\n", latinRows));
+        return builder.toString();
+    }
+
+    private String buildReadableRaw(ScoreboardSnapshot snapshot, List<String> chineseRows) {
+        StringBuilder builder = new StringBuilder();
+        if (!TextUtils.isEmpty(snapshot.mapName)) {
+            builder.append("地图 ").append(snapshot.mapName).append('\n');
+        }
+        if (!TextUtils.isEmpty(snapshot.scoreText)) {
+            builder.append("比分 ").append(snapshot.scoreText).append('\n');
+        }
+        for (String row : chineseRows) {
+            builder.append(row).append('\n');
         }
         return builder.toString().trim();
     }
 
-    private Bitmap crop(Bitmap source, CropSpec spec) {
-        int width = source.getWidth();
-        int height = source.getHeight();
-        int left = clamp(Math.round(width * spec.left), 0, width - 2);
-        int top = clamp(Math.round(height * spec.top), 0, height - 2);
-        int right = clamp(Math.round(width * spec.right), left + 1, width);
-        int bottom = clamp(Math.round(height * spec.bottom), top + 1, height);
-        return Bitmap.createBitmap(source, left, top, right - left, bottom - top);
-    }
-
-    private Bitmap prepareForOcr(Bitmap source, int scale) {
-        int safeScale = Math.max(1, scale);
-        Bitmap scaled = safeScale == 1
-                ? source.copy(Bitmap.Config.ARGB_8888, false)
-                : Bitmap.createScaledBitmap(source, source.getWidth() * safeScale, source.getHeight() * safeScale, false);
-        Bitmap output = Bitmap.createBitmap(scaled.getWidth(), scaled.getHeight(), Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(output);
-        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-        ColorMatrix grayscale = new ColorMatrix();
-        grayscale.setSaturation(0f);
-        ColorMatrix contrast = new ColorMatrix(new float[]{
-                1.45f, 0f, 0f, 0f, -28f,
-                0f, 1.45f, 0f, 0f, -28f,
-                0f, 0f, 1.45f, 0f, -28f,
-                0f, 0f, 0f, 1f, 0f
-        });
-        contrast.postConcat(grayscale);
-        paint.setColorFilter(new ColorMatrixColorFilter(contrast));
-        canvas.drawBitmap(scaled, 0f, 0f, paint);
-        if (scaled != source) {
-            scaled.recycle();
+    private Text resultOf(Task<Text> task) {
+        if (task == null || !task.isSuccessful()) {
+            return null;
         }
-        return output;
+        return task.getResult();
     }
 
-    private Bitmap binarizeLightText(Bitmap source, int scale) {
-        int safeScale = Math.max(2, scale);
-        Bitmap scaled = Bitmap.createScaledBitmap(source, source.getWidth() * safeScale, source.getHeight() * safeScale, false);
-        Bitmap output = Bitmap.createBitmap(scaled.getWidth(), scaled.getHeight(), Bitmap.Config.ARGB_8888);
-        int width = scaled.getWidth();
-        int height = scaled.getHeight();
-        int[] pixels = new int[width * height];
-        scaled.getPixels(pixels, 0, width, 0, 0, width, height);
-
-        // Adaptive threshold: derive the bright-text cutoff from the crop's own
-        // luminance distribution so dark or washed-out screenshots binarize cleanly.
-        long luminanceSum = 0;
-        for (int pixel : pixels) {
-            int red = (pixel >> 16) & 0xff;
-            int green = (pixel >> 8) & 0xff;
-            int blue = pixel & 0xff;
-            luminanceSum += (red * 299 + green * 587 + blue * 114) / 1000;
-        }
-        int meanLuminance = (int) (luminanceSum / Math.max(1, pixels.length));
-        int brightThreshold = clamp(meanLuminance + 28, 130, 200);
-
-        for (int i = 0; i < pixels.length; i++) {
-            int color = pixels[i];
-            int red = (color >> 16) & 0xff;
-            int green = (color >> 8) & 0xff;
-            int blue = color & 0xff;
-            int max = Math.max(red, Math.max(green, blue));
-            int min = Math.min(red, Math.min(green, blue));
-            int luminance = (red * 299 + green * 587 + blue * 114) / 1000;
-            boolean brightText = luminance >= brightThreshold && max - min <= 95;
-            boolean yellowText = red >= 150 && green >= 120 && blue <= 105;
-            boolean blueWhiteText = blue >= 135 && red >= 105 && green >= 115;
-            pixels[i] = (brightText || yellowText || blueWhiteText) ? 0xff000000 : 0xffffffff;
-        }
-        output.setPixels(pixels, 0, width, 0, 0, width, height);
-        scaled.recycle();
-        return output;
-    }
-
-    private int clamp(int value, int min, int max) {
-        return Math.max(min, Math.min(max, value));
-    }
-
-    private void recycleAll(List<Bitmap> bitmaps) {
-        for (Bitmap bitmap : bitmaps) {
-            if (bitmap != null && !bitmap.isRecycled()) {
-                bitmap.recycle();
-            }
-        }
-    }
-
-    private String readTaskText(Task<Text> task) {
-        if (task == null || !task.isSuccessful() || task.getResult() == null) {
+    private String textOf(Text text) {
+        if (text == null || text.getText() == null) {
             return "";
         }
-        String text = task.getResult().getText();
-        return text == null ? "" : text.trim();
+        return text.getText().trim();
     }
 
-    private String mergeTexts(String latinText, String chineseText) {
-        if (TextUtils.isEmpty(latinText)) {
-            return empty(chineseText);
-        }
-        if (TextUtils.isEmpty(chineseText)) {
-            return empty(latinText);
-        }
-        if (latinText.equals(chineseText)) {
-            return latinText;
-        }
-        return latinText + "\n\n-----\n\n" + chineseText;
-    }
+    private static final class Element {
+        final String text;
+        final int centerX;
+        final int centerY;
+        final int height;
 
-    private String empty(String value) {
-        return value == null ? "" : value;
-    }
-
-    private static class CropSpec {
-        final String label;
-        final float left;
-        final float top;
-        final float right;
-        final float bottom;
-        final int scale;
-
-        CropSpec(String label, float left, float top, float right, float bottom, int scale) {
-            this.label = label;
-            this.left = left;
-            this.top = top;
-            this.right = right;
-            this.bottom = bottom;
-            this.scale = scale;
-        }
-    }
-
-    private static class PendingRecognition {
-        final String section;
-        final String language;
-        final Task<Text> task;
-
-        PendingRecognition(String section, String language, Task<Text> task) {
-            this.section = section;
-            this.language = language;
-            this.task = task;
+        Element(String text, int centerX, int centerY, int height) {
+            this.text = text;
+            this.centerX = centerX;
+            this.centerY = centerY;
+            this.height = height;
         }
     }
 }

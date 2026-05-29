@@ -19,4 +19,13 @@ public class OpenAiStreamClientTest {
         assertEquals("", OpenAiStreamClient.extractDeltaContent("event: ping"));
         assertEquals("", OpenAiStreamClient.extractDeltaContent("data: {invalid-json"));
     }
+
+    @Test
+    public void extractDeltaContent_shouldIgnoreJsonNullContent() {
+        // Reasoning/role/finish chunks carry content:null; these must not append "null".
+        assertEquals("", OpenAiStreamClient.extractDeltaContent(
+                "data: {\"choices\":[{\"delta\":{\"content\":null}}]}"));
+        assertEquals("", OpenAiStreamClient.extractDeltaContent(
+                "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}"));
+    }
 }

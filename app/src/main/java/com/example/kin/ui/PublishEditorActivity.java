@@ -152,46 +152,12 @@ public class PublishEditorActivity extends AppCompatActivity {
         contentLayout.addView(statusView);
         contentLayout.addView(buildDraftCard());
         contentLayout.addView(buildTypeHeader());
-        contentLayout.addView(buildAdvancedCreationCard());
         contentLayout.addView(buildForm());
         scrollView.addView(contentLayout);
         root.addView(scrollView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         setContentView(root);
         updateTypeUi();
         updateImageState();
-    }
-
-    private View buildAdvancedCreationCard() {
-        MaterialCardView card = KinUi.card(this);
-        LinearLayout body = KinUi.sectionContainer(this, 18);
-        body.addView(KinUi.text(this, "创作辅助工具", 18, true));
-        TextView subtitle = KinUi.muted(this, "Markdown、模板、章节、质量检测、标注、多媒体、翻译、协作、定时和引用卡片可按需配置。", 14);
-        KinUi.margins(subtitle, this, 0, 8, 0, 0);
-        body.addView(subtitle);
-        LinearLayout row = KinUi.buttonRow(this,
-                featureButton("Markdown", "content.markdown_editor"),
-                featureButton("模板", "content.post_templates"),
-                featureButton("质量检测", "content.quality_check"));
-        KinUi.margins(row, this, 0, 12, 0, 0);
-        body.addView(row);
-        LinearLayout row2 = KinUi.buttonRow(this,
-                featureButton("图片标注", "content.image_annotation"),
-                featureButton("翻译", "content.multilingual_translation"),
-                featureButton("定时", "content.scheduled_publish"));
-        KinUi.margins(row2, this, 0, 10, 0, 0);
-        body.addView(row2);
-        card.addView(body);
-        return card;
-    }
-
-    private MaterialButton featureButton(String label, String featureKey) {
-        MaterialButton button = KinUi.outlinedButton(this, label);
-        button.setOnClickListener(v -> {
-            Intent intent = new Intent(this, com.example.kin.ui.future.FutureFeatureDetailActivity.class);
-            intent.putExtra(com.example.kin.ui.future.FutureFeatureDetailActivity.EXTRA_FEATURE_KEY, featureKey);
-            startActivity(intent);
-        });
-        return button;
     }
 
     private View buildDraftCard() {

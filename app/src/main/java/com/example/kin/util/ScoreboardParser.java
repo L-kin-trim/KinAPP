@@ -158,8 +158,11 @@ public final class ScoreboardParser {
                 continue;
             }
             ScoreboardSnapshot.PlayerStat stat = new ScoreboardSnapshot.PlayerStat();
+            // Drop a leading standalone ping/level number (e.g. "45 指尖抚轻纱")
+            // while keeping names that themselves contain digits (e.g. bj30380773).
+            int nameStart = (index >= 1 && tokens[0].matches("\\d{1,3}")) ? 1 : 0;
             StringBuilder name = new StringBuilder();
-            for (int i = 0; i <= index; i++) {
+            for (int i = nameStart; i <= index; i++) {
                 if (name.length() > 0) {
                     name.append(' ');
                 }

@@ -221,7 +221,7 @@ public class OpenAiStreamClient {
                 return "";
             }
             JSONObject delta = first.optJSONObject("delta");
-            if (delta == null) {
+            if (delta == null || delta.isNull("content")) {
                 return "";
             }
             return delta.optString("content", "");
