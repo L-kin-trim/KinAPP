@@ -574,6 +574,10 @@ public class HomeFragment extends BasePageFragment {
         footer.setGravity(android.view.Gravity.CENTER_VERTICAL);
         KinUi.margins(footer, activity, 0, 12, 0, 0);
 
+        TextView category = buildCategoryBadge(activity, feedCategoryLabel(post));
+        KinUi.margins(category, activity, 0, 0, 8, 0);
+        footer.addView(category);
+
         TextView author = KinUi.muted(activity, safeText(post.createdByUsername, "\u7528\u6237"), 13);
         author.setMaxLines(1);
         author.setEllipsize(TextUtils.TruncateAt.END);
@@ -725,6 +729,19 @@ public class HomeFragment extends BasePageFragment {
     }
 
     private String categoryText(ForumPostModel post) {
+        if (!TextUtils.isEmpty(post.mapName)) {
+            return post.mapName;
+        }
+        return translateType(post.postType);
+    }
+
+    private String feedCategoryLabel(ForumPostModel post) {
+        if ("PROP_SHARE".equals(post.postType)) {
+            return "CS2道具分享";
+        }
+        if ("TACTIC_SHARE".equals(post.postType)) {
+            return "CS2战术分享";
+        }
         if (!TextUtils.isEmpty(post.mapName)) {
             return post.mapName;
         }

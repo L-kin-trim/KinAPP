@@ -11,6 +11,7 @@ import com.example.kin.model.DraftModel;
 import com.example.kin.model.FavoriteStatus;
 import com.example.kin.model.ForumCommentModel;
 import com.example.kin.model.ForumPostModel;
+import com.example.kin.model.ForumZoneModel;
 import com.example.kin.model.FutureAsyncTask;
 import com.example.kin.model.FutureFeatureDefinition;
 import com.example.kin.model.FutureFeatureRecord;
@@ -594,6 +595,23 @@ public class KinRepository {
 
     public void deleteReviewTemplate(long templateId, ApiCallback<JSONObject> callback) {
         apiClient.deleteJson("/api/admin/review/templates/" + templateId, null, true, callback);
+    }
+
+    public void getForumZones(ApiCallback<List<ForumZoneModel>> callback) {
+        apiClient.get("/api/forum/zones", null, true, listCallback(callback, JsonUtils::parseForumZone));
+    }
+
+    public void createForumZone(String name, ApiCallback<ForumZoneModel> callback) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("name", name);
+        } catch (Exception ignored) {
+        }
+        apiClient.postJson("/api/admin/forum/zones", body, true, modelCallback(callback, JsonUtils::parseForumZone));
+    }
+
+    public void deleteForumZone(long zoneId, ApiCallback<JSONObject> callback) {
+        apiClient.deleteJson("/api/admin/forum/zones/" + zoneId, null, true, callback);
     }
 
     public void getAdminReports(String status, String targetType, String reasonType, String reporterUsername,

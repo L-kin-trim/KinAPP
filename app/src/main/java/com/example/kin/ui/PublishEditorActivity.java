@@ -66,9 +66,10 @@ public class PublishEditorActivity extends AppCompatActivity {
     private LinearLayout mapSection;
     private LinearLayout zoneSection;
     private final List<Chip> typeChips = new ArrayList<>();
-    private final List<Chip> zoneChips = new ArrayList<>();
-    private static final String[] ZONES = {"CS2分区", "逃离塔科夫分区", "战争雷霆分区"};
-    private String currentZone = ZONES[0];
+    private static final String[] DEFAULT_ZONES = {"CS2分区", "逃离塔科夫分区", "战争雷霆分区"};
+    private final List<String> zoneNames = new ArrayList<>(java.util.Arrays.asList(DEFAULT_ZONES));
+    private String currentZone = DEFAULT_ZONES[0];
+    private MaterialButton zoneButton;
 
     private TextInputEditText propNameEdit;
     private TextInputEditText mapNameEdit;
@@ -135,6 +136,7 @@ public class PublishEditorActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         repository = new KinRepository(this);
         buildUi();
+        loadZones();
         hydrateDrafts();
     }
 
@@ -222,17 +224,54 @@ public class PublishEditorActivity extends AppCompatActivity {
         return chip;
     }
 
-    private Chip zoneChip(String label) {
-        Chip chip = KinUi.chip(this, label);
-        chip.setCheckable(true);
-        KinUi.margins(chip, this, 0, 0, KinUi.dp(this, 8), 0);
-        chip.setOnClickListener(v -> {
-            currentZone = label;
-            updateZoneUi();
-            scheduleAutoSave();
+    private void loadZones() {
+        repository.getForumZones(new ApiCallback<>() {
+            @Override
+            public void onSuccess(List<com.example.kin.model.ForumZoneModel> data) {
+                if (data == null || data.isEmpty()) {
+                    return;
+                }
+                zoneNames.clear();
+                for (com.example.kin.model.ForumZoneModel zone : data) {
+                    if (!TextUtils.isEmpty(zone.name)) {
+                        zoneNames.add(zone.name);
+                    }
+                }
+                if (!zoneNames.contains(currentZone) && !zoneNames.isEmpty()) {
+                    currentZone = zoneNames.get(0);
+                }
+                refreshZoneButton();
+            }
+
+            @Override
+            public void onError(ApiException exception) {
+                // 分区接口不可用时保留默认分区，发帖仍可继续
+            }
         });
-        zoneChips.add(chip);
-        return chip;
+    }
+
+    private void showZonePicker() {
+        if (zoneNames.isEmpty()) {
+            return;
+        }
+        String[] options = zoneNames.toArray(new String[0]);
+        int checked = Math.max(0, zoneNames.indexOf(currentZone));
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("选择分区")
+                .setSingleChoiceItems(options, checked, (dialog, which) -> {
+                    currentZone = options[which];
+                    refreshZoneButton();
+                    scheduleAutoSave();
+                    dialog.dismiss();
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void refreshZoneButton() {
+        if (zoneButton != null) {
+            zoneButton.setText(currentZone);
+        }
     }
 
     private void applyChipStyle(Chip chip, boolean checked) {
@@ -246,12 +285,6 @@ public class PublishEditorActivity extends AppCompatActivity {
                 : getColor(R.color.kin_light_panel_alt);
         chip.setChipBackgroundColor(ColorStateList.valueOf(checked ? Color.TRANSPARENT : unselectedBg));
         chip.setTextColor(checked ? onSurface : getColor(R.color.kin_text_muted));
-    }
-
-    private void updateZoneUi() {
-        for (Chip chip : zoneChips) {
-            applyChipStyle(chip, String.valueOf(chip.getText()).equals(currentZone));
-        }
     }
 
     private ImageView addImagePreview(LinearLayout parent) {
@@ -310,13 +343,10 @@ public class PublishEditorActivity extends AppCompatActivity {
 
         zoneSection = KinUi.vertical(this);
         zoneSection.addView(KinUi.muted(this, "分区", 13));
-        LinearLayout zoneRow = new LinearLayout(this);
-        zoneRow.setOrientation(LinearLayout.HORIZONTAL);
-        for (String zone : ZONES) {
-            zoneRow.addView(zoneChip(zone));
-        }
-        KinUi.margins(zoneRow, this, 0, 8, 0, 0);
-        zoneSection.addView(zoneRow);
+        zoneButton = KinUi.outlinedButton(this, currentZone);
+        zoneButton.setOnClickListener(v -> showZonePicker());
+        KinUi.margins(zoneButton, this, 0, 8, 0, 0);
+        zoneSection.addView(zoneButton);
         body.addView(zoneSection);
 
         propSection = KinUi.vertical(this);
@@ -427,10 +457,10 @@ public class PublishEditorActivity extends AppCompatActivity {
             currentType = payload.optString("postType", currentType);
             String savedMapName = payload.optString("mapName");
             mapNameEdit.setText(savedMapName);
-            for (String zone : ZONES) {
-                if (zone.equals(savedMapName)) {
-                    currentZone = zone;
-                    break;
+            if (("DAILY_CHAT".equals(currentType) || "OTHER".equals(currentType)) && !TextUtils.isEmpty(savedMapName)) {
+                currentZone = savedMapName;
+                if (!zoneNames.contains(savedMapName)) {
+                    zoneNames.add(savedMapName);
                 }
             }
             propNameEdit.setText(payload.optString("propName"));
@@ -468,7 +498,7 @@ public class PublishEditorActivity extends AppCompatActivity {
         propSection.setVisibility(isProp ? View.VISIBLE : View.GONE);
         tacticSection.setVisibility(isTactic ? View.VISIBLE : View.GONE);
         dailySection.setVisibility(isDaily ? View.VISIBLE : View.GONE);
-        updateZoneUi();
+        refreshZoneButton();
     }
 
     private void updateImageState() {

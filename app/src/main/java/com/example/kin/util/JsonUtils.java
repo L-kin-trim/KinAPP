@@ -6,6 +6,7 @@ import com.example.kin.model.FavoriteStatus;
 import com.example.kin.model.DraftModel;
 import com.example.kin.model.ForumCommentModel;
 import com.example.kin.model.ForumPostModel;
+import com.example.kin.model.ForumZoneModel;
 import com.example.kin.model.FutureAsyncTask;
 import com.example.kin.model.FutureFeatureRecord;
 import com.example.kin.model.HotKeywordModel;
@@ -304,6 +305,13 @@ public final class JsonUtils {
         model.templateName = optString(json, "templateName");
         model.templateContent = optString(json, "templateContent");
         model.enabled = json.optBoolean("enabled", true);
+        return model;
+    }
+
+    public static ForumZoneModel parseForumZone(JSONObject json) {
+        ForumZoneModel model = new ForumZoneModel();
+        model.id = optLong(json, "id");
+        model.name = optString(json, "name");
         return model;
     }
 

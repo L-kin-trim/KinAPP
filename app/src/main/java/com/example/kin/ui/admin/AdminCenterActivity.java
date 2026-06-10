@@ -17,6 +17,7 @@ import com.example.kin.data.KinRepository;
 import com.example.kin.model.AuditLogModel;
 import com.example.kin.model.ForumCommentModel;
 import com.example.kin.model.ForumPostModel;
+import com.example.kin.model.ForumZoneModel;
 import com.example.kin.model.MessageBoardEntryModel;
 import com.example.kin.model.PageResult;
 import com.example.kin.model.ReportModel;
@@ -46,6 +47,7 @@ public class AdminCenterActivity extends AppCompatActivity {
     private LinearLayout reportsLayout;
     private LinearLayout boardLayout;
     private LinearLayout templatesLayout;
+    private LinearLayout zonesLayout;
     private LinearLayout logsLayout;
     private LinearLayout usersLayout;
     private ProgressBar progressBar;
@@ -116,6 +118,10 @@ public class AdminCenterActivity extends AppCompatActivity {
         contentLayout.addView(sectionTitle("审核模板"));
         templatesLayout = KinUi.vertical(this);
         contentLayout.addView(templatesLayout);
+
+        contentLayout.addView(sectionTitle("分区管理"));
+        zonesLayout = KinUi.vertical(this);
+        contentLayout.addView(zonesLayout);
 
         contentLayout.addView(sectionTitle("审计日志"));
         logsLayout = KinUi.vertical(this);
@@ -247,6 +253,7 @@ public class AdminCenterActivity extends AppCompatActivity {
         loadReports();
         loadMessageBoard();
         loadTemplates();
+        loadZones();
         loadAuditLogs();
         searchUsers("");
     }
@@ -700,6 +707,79 @@ public class AdminCenterActivity extends AppCompatActivity {
                         repository.updateReviewTemplate(template.id, text(nameEdit), text(contentEdit), true, callback);
                     }
                 })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void loadZones() {
+        zonesLayout.removeAllViews();
+        MaterialButton addButton = KinUi.filledButton(this, "新增分区");
+        addButton.setOnClickListener(v -> showZoneCreateDialog());
+        zonesLayout.addView(addButton);
+        repository.getForumZones(new ApiCallback<>() {
+            @Override
+            public void onSuccess(List<ForumZoneModel> data) {
+                if (data.isEmpty()) {
+                    zonesLayout.addView(info("状态", "暂无分区"));
+                    return;
+                }
+                for (ForumZoneModel item : data) {
+                    zonesLayout.addView(zoneCard(item));
+                }
+            }
+
+            @Override
+            public void onError(ApiException exception) {
+                zonesLayout.addView(info("状态", exception.isFeatureUnavailable() ? "分区接口未开放" : "分区加载失败"));
+            }
+        });
+    }
+
+    private View zoneCard(ForumZoneModel item) {
+        MaterialCardView card = KinUi.card(this);
+        LinearLayout body = KinUi.sectionContainer(this, 16);
+        body.addView(KinUi.text(this, item.name, 16, true));
+        body.addView(actionRow(
+                buildButton("删除", v -> new AlertDialog.Builder(this)
+                        .setTitle("删除分区")
+                        .setMessage("确认删除分区「" + item.name + "」吗？已发布帖子的分区标签不受影响。")
+                        .setPositiveButton("删除", (dialog, which) -> repository.deleteForumZone(item.id, new ApiCallback<>() {
+                            @Override
+                            public void onSuccess(JSONObject data) {
+                                loadZones();
+                            }
+
+                            @Override
+                            public void onError(ApiException exception) {
+                                setLoading(false, "分区删除失败：" + exception.getMessage());
+                            }
+                        }))
+                        .setNegativeButton("取消", null)
+                        .show())
+        ));
+        card.addView(body);
+        return card;
+    }
+
+    private void showZoneCreateDialog() {
+        LinearLayout root = KinUi.vertical(this);
+        TextInputLayout nameLayout = KinUi.inputLayout(this, "分区名称（如 CS2分区）", false);
+        TextInputEditText nameEdit = KinUi.edit(nameLayout);
+        root.addView(nameLayout);
+        new AlertDialog.Builder(this)
+                .setTitle("新增分区")
+                .setView(root)
+                .setPositiveButton("创建", (dialog, which) -> repository.createForumZone(text(nameEdit), new ApiCallback<>() {
+                    @Override
+                    public void onSuccess(ForumZoneModel data) {
+                        loadZones();
+                    }
+
+                    @Override
+                    public void onError(ApiException exception) {
+                        setLoading(false, "分区创建失败：" + exception.getMessage());
+                    }
+                }))
                 .setNegativeButton("取消", null)
                 .show();
     }
