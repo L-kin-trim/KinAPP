@@ -1,5 +1,8 @@
 package com.example.kin.ui;
 
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -10,6 +13,8 @@ import android.text.TextUtils;
 import android.content.Intent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -58,7 +63,12 @@ public class PublishEditorActivity extends AppCompatActivity {
     private LinearLayout propSection;
     private LinearLayout tacticSection;
     private LinearLayout dailySection;
+    private LinearLayout mapSection;
+    private LinearLayout zoneSection;
     private final List<Chip> typeChips = new ArrayList<>();
+    private final List<Chip> zoneChips = new ArrayList<>();
+    private static final String[] ZONES = {"CS2分区", "逃离塔科夫分区", "战争雷霆分区"};
+    private String currentZone = ZONES[0];
 
     private TextInputEditText propNameEdit;
     private TextInputEditText mapNameEdit;
@@ -81,6 +91,10 @@ public class PublishEditorActivity extends AppCompatActivity {
     private TextView aimState;
     private TextView landingState;
     private TextView galleryState;
+    private ImageView stancePreview;
+    private ImageView aimPreview;
+    private ImageView landingPreview;
+    private LinearLayout galleryPreviewRow;
 
     private final ActivityResultLauncher<String> stancePicker = registerForActivityResult(
             new ActivityResultContracts.GetContent(),
@@ -208,11 +222,102 @@ public class PublishEditorActivity extends AppCompatActivity {
         return chip;
     }
 
+    private Chip zoneChip(String label) {
+        Chip chip = KinUi.chip(this, label);
+        chip.setCheckable(true);
+        KinUi.margins(chip, this, 0, 0, KinUi.dp(this, 8), 0);
+        chip.setOnClickListener(v -> {
+            currentZone = label;
+            updateZoneUi();
+            scheduleAutoSave();
+        });
+        zoneChips.add(chip);
+        return chip;
+    }
+
+    private void applyChipStyle(Chip chip, boolean checked) {
+        chip.setCheckedIconVisible(false);
+        chip.setChipIconVisible(false);
+        chip.setChipStrokeWidth(checked ? KinUi.dp(this, 2) : 0);
+        int onSurface = KinUi.color(this, com.google.android.material.R.attr.colorOnSurface);
+        chip.setChipStrokeColor(ColorStateList.valueOf(onSurface));
+        int unselectedBg = KinUi.isNight(this)
+                ? getColor(R.color.kin_dark_panel_alt)
+                : getColor(R.color.kin_light_panel_alt);
+        chip.setChipBackgroundColor(ColorStateList.valueOf(checked ? Color.TRANSPARENT : unselectedBg));
+        chip.setTextColor(checked ? onSurface : getColor(R.color.kin_text_muted));
+    }
+
+    private void updateZoneUi() {
+        for (Chip chip : zoneChips) {
+            applyChipStyle(chip, String.valueOf(chip.getText()).equals(currentZone));
+        }
+    }
+
+    private ImageView addImagePreview(LinearLayout parent) {
+        ImageView imageView = new ImageView(this);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(KinUi.dp(this, 160), KinUi.dp(this, 112));
+        params.topMargin = KinUi.dp(this, 10);
+        imageView.setLayoutParams(params);
+        imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        imageView.setBackground(previewBackground());
+        imageView.setClipToOutline(true);
+        imageView.setVisibility(View.GONE);
+        parent.addView(imageView);
+        return imageView;
+    }
+
+    private LinearLayout addGalleryPreview(LinearLayout parent) {
+        HorizontalScrollView scrollView = new HorizontalScrollView(this);
+        scrollView.setHorizontalScrollBarEnabled(false);
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        scrollView.addView(row);
+        KinUi.margins(scrollView, this, 0, 8, 0, 0);
+        parent.addView(scrollView);
+        return row;
+    }
+
+    private GradientDrawable previewBackground() {
+        GradientDrawable background = new GradientDrawable();
+        background.setCornerRadius(KinUi.dp(this, 18));
+        background.setColor(KinUi.isNight(this)
+                ? getColor(R.color.kin_dark_panel_alt)
+                : getColor(R.color.kin_light_panel_alt));
+        return background;
+    }
+
+    private void bindSinglePreview(ImageView imageView, Uri uri) {
+        if (imageView == null) {
+            return;
+        }
+        if (uri == null) {
+            imageView.setImageDrawable(null);
+            imageView.setVisibility(View.GONE);
+        } else {
+            imageView.setImageURI(uri);
+            imageView.setVisibility(View.VISIBLE);
+        }
+    }
+
     private View buildForm() {
         MaterialCardView card = KinUi.card(this);
         LinearLayout body = KinUi.sectionContainer(this, 18);
 
-        mapNameEdit = addInput(body, "地图", false);
+        mapSection = KinUi.vertical(this);
+        mapNameEdit = addInput(mapSection, "地图", false);
+        body.addView(mapSection);
+
+        zoneSection = KinUi.vertical(this);
+        zoneSection.addView(KinUi.muted(this, "分区", 13));
+        LinearLayout zoneRow = new LinearLayout(this);
+        zoneRow.setOrientation(LinearLayout.HORIZONTAL);
+        for (String zone : ZONES) {
+            zoneRow.addView(zoneChip(zone));
+        }
+        KinUi.margins(zoneRow, this, 0, 8, 0, 0);
+        zoneSection.addView(zoneRow);
+        body.addView(zoneSection);
 
         propSection = KinUi.vertical(this);
         propNameEdit = addInput(propSection, "道具名称", false);
@@ -220,8 +325,11 @@ public class PublishEditorActivity extends AppCompatActivity {
         throwMethodEdit = addInput(propSection, "投掷方式", false);
         propPositionEdit = addInput(propSection, "道具位置", true);
         stanceState = imageRow(propSection, "站位图", () -> stancePicker.launch("image/*"));
+        stancePreview = addImagePreview(propSection);
         aimState = imageRow(propSection, "瞄点图", () -> aimPicker.launch("image/*"));
+        aimPreview = addImagePreview(propSection);
         landingState = imageRow(propSection, "落点图", () -> landingPicker.launch("image/*"));
+        landingPreview = addImagePreview(propSection);
 
         tacticSection = KinUi.vertical(this);
         tacticNameEdit = addInput(tacticSection, "战术名称", false);
@@ -241,6 +349,7 @@ public class PublishEditorActivity extends AppCompatActivity {
         dailySection.addView(markdownHint);
         contentEdit = addInput(dailySection, "添加正文（支持 Markdown）", true);
         galleryState = imageRow(dailySection, "图片上传（最多 10 张）", () -> galleryPicker.launch("image/*"));
+        galleryPreviewRow = addGalleryPreview(dailySection);
 
         body.addView(propSection);
         KinUi.margins(tacticSection, this, 0, 14, 0, 0);
@@ -316,7 +425,14 @@ public class PublishEditorActivity extends AppCompatActivity {
         try {
             JSONObject payload = new JSONObject(payloadJson);
             currentType = payload.optString("postType", currentType);
-            mapNameEdit.setText(payload.optString("mapName"));
+            String savedMapName = payload.optString("mapName");
+            mapNameEdit.setText(savedMapName);
+            for (String zone : ZONES) {
+                if (zone.equals(savedMapName)) {
+                    currentZone = zone;
+                    break;
+                }
+            }
             propNameEdit.setText(payload.optString("propName"));
             toolTypeEdit.setText(payload.optString("toolType"));
             throwMethodEdit.setText(payload.optString("throwMethod"));
@@ -342,10 +458,17 @@ public class PublishEditorActivity extends AppCompatActivity {
                     || ("TACTIC_SHARE".equals(currentType) && text.contains("战术"))
                     || ("DAILY_CHAT".equals(currentType) && text.contains("日常"));
             chip.setChecked(checked);
+            applyChipStyle(chip, checked);
         }
-        propSection.setVisibility("PROP_SHARE".equals(currentType) ? View.VISIBLE : View.GONE);
-        tacticSection.setVisibility("TACTIC_SHARE".equals(currentType) ? View.VISIBLE : View.GONE);
-        dailySection.setVisibility("DAILY_CHAT".equals(currentType) || "OTHER".equals(currentType) ? View.VISIBLE : View.GONE);
+        boolean isProp = "PROP_SHARE".equals(currentType);
+        boolean isTactic = "TACTIC_SHARE".equals(currentType);
+        boolean isDaily = "DAILY_CHAT".equals(currentType) || "OTHER".equals(currentType);
+        mapSection.setVisibility(isProp || isTactic ? View.VISIBLE : View.GONE);
+        zoneSection.setVisibility(isDaily ? View.VISIBLE : View.GONE);
+        propSection.setVisibility(isProp ? View.VISIBLE : View.GONE);
+        tacticSection.setVisibility(isTactic ? View.VISIBLE : View.GONE);
+        dailySection.setVisibility(isDaily ? View.VISIBLE : View.GONE);
+        updateZoneUi();
     }
 
     private void updateImageState() {
@@ -360,6 +483,23 @@ public class PublishEditorActivity extends AppCompatActivity {
         }
         if (galleryState != null) {
             galleryState.setText("图片上传（最多 10 张）：" + galleryUris.size() + " 张");
+        }
+        bindSinglePreview(stancePreview, stanceUri);
+        bindSinglePreview(aimPreview, aimUri);
+        bindSinglePreview(landingPreview, landingUri);
+        if (galleryPreviewRow != null) {
+            galleryPreviewRow.removeAllViews();
+            for (Uri uri : galleryUris) {
+                ImageView imageView = new ImageView(this);
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(KinUi.dp(this, 120), KinUi.dp(this, 90));
+                params.rightMargin = KinUi.dp(this, 10);
+                imageView.setLayoutParams(params);
+                imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                imageView.setBackground(previewBackground());
+                imageView.setClipToOutline(true);
+                imageView.setImageURI(uri);
+                galleryPreviewRow.addView(imageView);
+            }
         }
     }
 
@@ -542,6 +682,7 @@ public class PublishEditorActivity extends AppCompatActivity {
                     payload.put("member" + (i + 1) + "Role", text(roleEdits.get(i)));
                 }
             } else {
+                payload.put("mapName", currentZone);
                 payload.put("title", text(dailyTitleEdit));
                 payload.put("content", text(contentEdit));
                 payload.put("contentFormat", "MARKDOWN");
