@@ -89,13 +89,14 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
         topBar.inflateMenu(R.menu.menu_main_top);
         updateFutureMenuVisibility();
         updatePageSearchMenuVisibility(0);
+        updateTopContextActionForPage(0);
         topBar.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == R.id.action_page_search) {
                 openCurrentPageSearch();
                 return true;
             }
-            if (item.getItemId() == R.id.action_ai_settings) {
-                openAiSettings();
+            if (item.getItemId() == R.id.action_top_context) {
+                openTopContextAction();
                 return true;
             }
             if (item.getItemId() == R.id.action_future_center) {
@@ -184,6 +185,19 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
         }
     }
 
+    private void updateTopContextActionForPage(int position) {
+        if (topBar == null) {
+            return;
+        }
+        MenuItem item = topBar.getMenu().findItem(R.id.action_top_context);
+        if (item == null) {
+            return;
+        }
+        boolean aiPage = position == 3;
+        item.setTitle(aiPage ? "AI \u8bbe\u7f6e" : "\u7ad9\u5185\u4fe1");
+        item.setIcon(aiPage ? android.R.drawable.ic_menu_manage : android.R.drawable.ic_dialog_email);
+    }
+
     private void openCurrentPageSearch() {
         int position = viewPager.getCurrentItem();
         Fragment fragment = rootFragments.get(position);
@@ -192,6 +206,14 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
         } else if (fragment instanceof LibraryFragment) {
             ((LibraryFragment) fragment).openSearch();
         }
+    }
+
+    private void openTopContextAction() {
+        if (viewPager != null && viewPager.getCurrentItem() == 3) {
+            openAiSettings();
+            return;
+        }
+        openMessages();
     }
 
     public void openPostDetail(long postId, boolean mine) {
@@ -258,6 +280,7 @@ public class MainActivity extends AppCompatActivity implements com.google.androi
         setTopBar(titles[position], "");
         refreshToolbarSubtitle();
         updatePageSearchMenuVisibility(position);
+        updateTopContextActionForPage(position);
     }
 
     private void ensureSessionAlive() {

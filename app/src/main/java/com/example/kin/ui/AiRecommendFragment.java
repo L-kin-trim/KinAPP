@@ -116,7 +116,7 @@ public class AiRecommendFragment extends BasePageFragment {
         LinearLayout body = KinUi.sectionContainer(activity, 20);
         body.addView(KinUi.text(activity, "\u5148\u914d\u7f6e AI \u6a21\u578b\u624d\u80fd\u63a8\u8350", 20, true));
         TextView hint = KinUi.muted(activity,
-                "\u5f53\u524d\u672a\u914d\u7f6e AI\uff0c\u53ef\u70b9\u51fb\u53f3\u4e0a\u89d2\u9f7f\u8f6e\u6216\u300c\u6211 > AI \u6a21\u578b\u914d\u7f6e\u300d\u3002",
+                "\u5f53\u524d\u672a\u914d\u7f6e AI\uff0c\u53ef\u5728 AI \u63a8\u8350\u9875\u70b9\u51fb\u53f3\u4e0a\u89d2\u9f7f\u8f6e\uff0c\u6216\u4f7f\u7528\u4e0b\u65b9\u6309\u94ae\u3002",
                 14);
         KinUi.margins(hint, activity, 0, 8, 0, 0);
         body.addView(hint);

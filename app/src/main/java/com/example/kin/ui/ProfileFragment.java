@@ -212,14 +212,12 @@ public class ProfileFragment extends BasePageFragment {
 
         body.addView(actionButton(activity, sessionManager.isLoggedIn() ? "\u5207\u6362\u8d26\u53f7" : "\u767b\u5f55 / \u6ce8\u518c",
                 v -> startActivity(new Intent(activity, AuthActivity.class))));
-        body.addView(actionButton(activity, "AI \u6a21\u578b\u914d\u7f6e",
-                v -> startActivity(new Intent(activity, AiSettingsActivity.class))));
+        body.addView(actionButton(activity, "\u7ad9\u5185\u4fe1",
+                v -> startActivity(new Intent(activity, MessagesActivity.class))));
         body.addView(actionButton(activity, "\u6211\u7684\u4e3b\u9875",
                 v -> startActivity(new Intent(activity, UserProfileActivity.class))));
         body.addView(actionButton(activity, "\u8349\u7a3f\u7bb1",
                 v -> startActivity(new Intent(activity, DraftsActivity.class))));
-        body.addView(actionButton(activity, "\u6d88\u606f\u4e2d\u5fc3",
-                v -> startActivity(new Intent(activity, MessagesActivity.class))));
         body.addView(actionButton(activity, "每日签到",
                 v -> startActivity(new Intent(activity, CheckInActivity.class))));
         body.addView(actionButton(activity, "\u7559\u8a00\u677f",
